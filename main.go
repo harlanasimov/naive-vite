@@ -300,7 +300,7 @@ func handleConn(conn net.Conn) {
 	node := initNode(address)
 	defer destoryNode(node)
 
-	io.WriteString(conn, address+", Enter role:")
+	io.WriteString(conn, address+", Enter role(1:tx node, 2:snapshot node):")
 
 	scanRole := bufio.NewScanner(conn)
 	if scanRole.Scan() {
