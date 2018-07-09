@@ -25,13 +25,15 @@ type Tx struct {
 }
 
 type AccountStateBlock struct {
-	Nonce     int
-	Timestamp string
-	Amount    int // the balance
-	Hash      string
-	PreHash   string
-	Signer    string
-	Tx        *Tx
+	Nonce          int
+	Timestamp      string
+	Amount         int // the balance
+	Hash           string
+	PreHash        string
+	Signer         string
+	SnapshotHeight int
+	SnapshotHash   string
+	Tx             *Tx
 }
 
 type SnapshotBlock struct {
@@ -162,7 +164,7 @@ func signTx(tx Tx, from string) Tx {
 	return tx
 }
 
-func generateFromAccountStateBlock(oldBlock AccountStateBlock, tx Tx, from string) AccountStateBlock {
+func generateFromAccountStateBlock(oldBlock AccountStateBlock, tx Tx, from string, snapshotHeight int, snapshotHash string) AccountStateBlock {
 	var newBlock AccountStateBlock
 
 	t := time.Now()
@@ -172,12 +174,14 @@ func generateFromAccountStateBlock(oldBlock AccountStateBlock, tx Tx, from strin
 	newBlock.Timestamp = t.String()
 	newBlock.Amount = oldBlock.Amount - tx.Amount
 	newBlock.PreHash = oldBlock.Hash
+	newBlock.SnapshotHeight = snapshotHeight
+	newBlock.SnapshotHash = snapshotHash
 
 	return newBlock
 }
 
 // generateBlock creates a new block using previous block's hash
-func generateToAccountStateBlock(oldBlock AccountStateBlock, tx Tx, to string) AccountStateBlock {
+func generateToAccountStateBlock(oldBlock AccountStateBlock, tx Tx, to string, snapshotHeight int, snapshotHash string) AccountStateBlock {
 	var newBlock AccountStateBlock
 
 	t := time.Now()
@@ -187,15 +191,15 @@ func generateToAccountStateBlock(oldBlock AccountStateBlock, tx Tx, to string) A
 	newBlock.Timestamp = t.String()
 	newBlock.Amount = oldBlock.Amount + tx.Amount
 	newBlock.PreHash = oldBlock.Hash
-	newBlock.Signer = to
-	newBlock.Hash = calculateAccountBlockHash(newBlock)
+	newBlock.SnapshotHeight = snapshotHeight
+	newBlock.SnapshotHash = snapshotHash
 
 	return newBlock
 }
 
-func generateGenesisAccountStateBlock(initBalance int, address string) AccountStateBlock {
+func generateGenesisAccountStateBlock(initBalance int, address string, snapshotHeight int, snapshotHash string) AccountStateBlock {
 	t := time.Now()
-	genesisBlock := AccountStateBlock{0, t.String(), initBalance, "", "", address, nil}
+	genesisBlock := AccountStateBlock{0, t.String(), initBalance, "", "", address, snapshotHeight, snapshotHash, nil}
 	return genesisBlock
 }
 
@@ -352,7 +356,7 @@ func receiveTx(node Node) {
 		receiveTx = signTx(receiveTx, node.address)
 
 		chain := myAccountBlockChain(node.address)
-		var block = generateToAccountStateBlock(chain, receiveTx, node.address)
+		var block = generateToAccountStateBlock(chain, receiveTx, node.address, snapshotBlockChain.Height, snapshotBlockChain.Hash)
 		block = signAccountStateBlock(block, node.address)
 
 		if appendAccountStateBlockChain(node.address, block) {
@@ -397,7 +401,9 @@ func initNode(node string) Node {
 
 	n := Node{address: node, receivedTxChan: make(chan Tx)}
 	nodes[node] = n
-	block := generateGenesisAccountStateBlock(100, node)
+	snapshotHeight := snapshotBlockChain.Height
+	snapshotHash := snapshotBlockChain.Hash
+	block := generateGenesisAccountStateBlock(100, node, snapshotHeight, snapshotHash)
 	block = signAccountStateBlock(block, node)
 	accountStateBlockChain[node] = block
 	stateBlockDB[block.Hash] = block
@@ -498,7 +504,7 @@ func submitTx(from string, to string, amount int) {
 	chain := myAccountBlockChain(from)
 	tx := generateSendTx(from, to, amount)
 	tx = signTx(tx, from)
-	var block = generateFromAccountStateBlock(chain, tx, from)
+	var block = generateFromAccountStateBlock(chain, tx, from, snapshotBlockChain.Height, snapshotBlockChain.Hash)
 	block = signAccountStateBlock(block, from)
 
 	if appendAccountStateBlockChain(from, block) {
@@ -525,10 +531,10 @@ func calculateTxHash(tx Tx) string {
 
 func calculateAccountBlockHash(block AccountStateBlock) string {
 	if block.Tx == nil {
-		record := string(block.Nonce) + block.Timestamp + string(block.Amount) + block.PreHash + block.Signer
+		record := string(block.Nonce) + block.Timestamp + string(block.Amount) + block.PreHash + block.Signer + block.SnapshotHash + string(block.SnapshotHeight)
 		return calculateHash(record)
 	} else {
-		record := string(block.Nonce) + block.Timestamp + string(block.Amount) + block.PreHash + block.Signer + block.Tx.Hash
+		record := string(block.Nonce) + block.Timestamp + string(block.Amount) + block.PreHash + block.Signer + block.SnapshotHash + string(block.SnapshotHeight) + block.Tx.Hash
 		return calculateHash(record)
 	}
 }
