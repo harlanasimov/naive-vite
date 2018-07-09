@@ -159,8 +159,8 @@ func generateReceivedTx(send Tx) Tx {
 }
 
 func signTx(tx Tx, from string) Tx {
-	tx.Hash = calculateTxHash(tx)
 	tx.Signer = from
+	tx.Hash = calculateTxHash(tx)
 	return tx
 }
 
@@ -525,7 +525,7 @@ func calculateHash(s string) string {
 }
 
 func calculateTxHash(tx Tx) string {
-	record := string(tx.Amount) + string(tx.AccountNonce) + string(tx.From) + string(tx.To) + string(tx.Source)
+	record := string(tx.Amount) + string(tx.AccountNonce) + string(tx.From) + string(tx.To) + string(tx.Source) + string(tx.Signer)
 	return calculateHash(record)
 }
 
