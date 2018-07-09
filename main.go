@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"log"
 	"net"
 	"strconv"
-	"time"
 	"sync"
-	"encoding/json"
+	"time"
 )
 
 type Tx struct {
@@ -72,6 +72,7 @@ var nodes = make(map[string]Node)
 
 // k1:hash   k2:node   v:accountHash
 var snapshotAccountMap = make(map[string]map[string]string)
+
 // k:hash  v:snapshotBlock
 var snapshotDB = make(map[string]SnapshotBlock)
 
@@ -147,12 +148,12 @@ func initSnapshotChain() {
 func generateSendTx(from string, to string, amount int) Tx {
 	fromBlock := myAccountBlockChain(from)
 	sendTx := Tx{1, fromBlock.Nonce + 1, amount, from, to, "", "", ""}
-	return sendTx;
+	return sendTx
 }
 func generateReceivedTx(send Tx) Tx {
 	toBlock := myAccountBlockChain(send.To)
 	sendTx := Tx{2, toBlock.Nonce + 1, send.Amount, send.From, send.To, "", send.Hash, ""}
-	return sendTx;
+	return sendTx
 }
 
 func signTx(tx Tx, from string) Tx {
@@ -424,8 +425,8 @@ func printAccountBlockChain(blocks map[string]AccountStateBlock) string {
 			result = "->" + result
 			tmp = getAccountState(tmp.PreHash)
 		}
-		result = k + ":" + result;
-		result = "\n" + result;
+		result = k + ":" + result
+		result = "\n" + result
 	}
 	return result
 }
@@ -453,7 +454,7 @@ func printSnapshotBlock(block SnapshotBlock) string {
 		state := getAccountState(v)
 		result = k + "->" + strconv.Itoa(state.Amount) + "," + result
 	}
-	result = "\n" + strconv.Itoa(block.Height) + ":" + result;
+	result = "\n" + strconv.Itoa(block.Height) + ":" + result
 	return result
 }
 func getAccountState(hash string) AccountStateBlock {
@@ -471,7 +472,7 @@ func sendTx(conn net.Conn, address string) {
 		io.WriteString(conn, "Enter to address:")
 		scanTx := bufio.NewScanner(conn)
 		var toAddress string
-		if (scanTx.Scan()) {
+		if scanTx.Scan() {
 			toAddress = scanTx.Text()
 			exists := existsAccountBlockChain(address)
 			if !exists {
@@ -481,7 +482,7 @@ func sendTx(conn net.Conn, address string) {
 		}
 		io.WriteString(conn, address+", Enter to amount:")
 
-		if (scanTx.Scan()) {
+		if scanTx.Scan() {
 			toAmount, err := strconv.Atoi(scanTx.Text())
 			if err != nil {
 				log.Printf("%v not a number: %v", scanTx.Text(), err)
@@ -523,7 +524,7 @@ func calculateTxHash(tx Tx) string {
 }
 
 func calculateAccountBlockHash(block AccountStateBlock) string {
-	if (block.Tx == nil) {
+	if block.Tx == nil {
 		record := string(block.Nonce) + block.Timestamp + string(block.Amount) + block.PreHash + block.Signer
 		return calculateHash(record)
 	} else {
