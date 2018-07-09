@@ -1,4 +1,4 @@
-# naiveVite
+# naive-vite
 simple implement of vite
 
 ```
