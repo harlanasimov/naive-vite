@@ -491,9 +491,9 @@ func sendTx(conn net.Conn, address string) {
 		var toAddress string
 		if scanTx.Scan() {
 			toAddress = scanTx.Text()
-			exists := existsAccountBlockChain(address)
+			exists := existsAccountBlockChain(toAddress)
 			if !exists {
-				io.WriteString(conn, "address:"+toAddress+" not exists")
+				io.WriteString(conn, "address:"+toAddress+" not exists\n")
 				continue
 			}
 		}
