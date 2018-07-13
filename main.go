@@ -215,6 +215,9 @@ func appendAccountStateBlockChain(node string, block AccountStateBlock) bool {
 	chainmutex.Lock()
 	defer chainmutex.Unlock()
 
+	if !validateAccountStateBlock(&block) {
+		return false
+	}
 	current := accountStateBlockChain[node]
 	if current.Hash == block.PreHash {
 		accountStateBlockChain[node] = block
@@ -253,7 +256,14 @@ func generateSnapshotBlock(current SnapshotBlock) (SnapshotBlock, map[string]str
 	return block, accounts
 }
 
-func appendSnapshotBlockChain(block SnapshotBlock, accounts map[string]string) {
+func appendSnapshotBlockChain(block SnapshotBlock, accounts map[string]string) bool {
+	if !validateSnapshotBlock(&block) {
+		return false
+	}
+
+	if block.Height != 0 && snapshotBlockChain.Hash != block.PreHash {
+		return false
+	}
 	snapshotBlockChain = block
 	snapshotDB[block.Hash] = block
 	snapshotAccountMap[block.AccountsHash] = accounts
@@ -261,6 +271,7 @@ func appendSnapshotBlockChain(block SnapshotBlock, accounts map[string]string) {
 		stateSnapshotMap[accountHash] = true
 	}
 	broadcastSnapshotBlock <- block
+	return true
 }
 
 func signSnapshotBlock(signer string, block SnapshotBlock) SnapshotBlock {
@@ -360,10 +371,10 @@ func receiveTx(node Node) {
 		block = signAccountStateBlock(block, node.address)
 
 		if appendAccountStateBlockChain(node.address, block) {
-			log.Printf("submit received Tx success.\n")
+			log.Printf("submit received Tx success [" + node.address + "].\n")
 			broadcastAccountBlock <- block
 		} else {
-			log.Printf("submit received Tx failed.\n")
+			log.Printf("submit received Tx failed  [" + node.address + "].\n")
 		}
 	}
 
@@ -508,10 +519,10 @@ func submitTx(from string, to string, amount int) {
 	block = signAccountStateBlock(block, from)
 
 	if appendAccountStateBlockChain(from, block) {
-		log.Printf("submit success.\n")
+		log.Printf("submit send Tx success[" + from + "].\n")
 		broadcastAccountBlock <- block
 	} else {
-		log.Printf("submit failed.\n")
+		log.Printf("submit send Tx failed[" + from + "].\n")
 	}
 }
 
