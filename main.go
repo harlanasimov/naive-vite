@@ -27,7 +27,7 @@ type Tx struct {
 type AccountStateBlock struct {
 	Nonce          int
 	Timestamp      string
-	Amount         int // the balance
+	Amount         int    // the balance
 	Hash           string
 	PreHash        string
 	Signer         string
@@ -55,9 +55,6 @@ var accountStateBlockChain = make(map[string]AccountStateBlock)
 var snapshotBlockChain SnapshotBlock
 
 var chainmutex = &sync.Mutex{}
-
-// var pendingTxs = make(map[string]Tx)
-var pendingAccountStatusBlocks = make(map[string][]AccountStateBlock)
 
 //var pendingSnapshotBlocks
 var broadcastAccountBlock = make(chan AccountStateBlock)
