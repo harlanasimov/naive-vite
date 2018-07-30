@@ -1,4 +1,4 @@
-package main
+package structure
 
 import (
 	"bufio"
@@ -78,7 +78,7 @@ var snapshotDB = make(map[string]SnapshotBlock)
 // whether it has been snapshotted
 var stateSnapshotMap = make(map[string]bool)
 
-func main() {
+func Run() {
 	httpPort := strconv.Itoa(9000)
 
 	// start TCP and serve TCP server
