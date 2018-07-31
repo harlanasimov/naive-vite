@@ -6,7 +6,7 @@ simple implement of vite
 
 one terminal, run main process:
 ```
-> cd naive-vite
+> cd naive-vite/cmd/structure
 > go run main.go
 ```
 
