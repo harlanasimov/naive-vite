@@ -1,28 +1,28 @@
 package log
 
 import (
-	"fmt"
+	"log"
 	"os"
-	"time"
 )
 
 func Debug(msg string, ctx ...interface{}) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05")+"[Debug]"+msg, ctx)
+	log.Printf("[Debug]"+msg+"\n", ctx...)
 }
 
 func Info(msg string, ctx ...interface{}) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05")+"[Info]"+msg, ctx)
+	log.Printf("[Info]"+msg+"\n", ctx...)
 }
 
 func Warn(msg string, ctx ...interface{}) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05")+"[Warn]"+msg, ctx)
+	log.Printf("[Warn]"+msg+"\n", ctx...)
 }
 
 func Error(msg string, ctx ...interface{}) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05")+"[Error]"+msg, ctx)
+	log.Printf("[Error]"+msg+"\n", ctx...)
+
 }
 
 func Fatal(msg string, ctx ...interface{}) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05")+"[Fatal]"+msg, ctx)
+	log.Printf("[Fatal]"+msg+"\n", ctx...)
 	os.Exit(1)
 }

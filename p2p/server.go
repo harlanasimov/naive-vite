@@ -2,18 +2,15 @@ package p2p
 
 import (
 	"net/http"
-
-	"sync"
-
 	"net/url"
+	"strconv"
+	"sync"
 	"time"
 
-	"encoding/json"
-
-	"strconv"
+	"context"
 
 	"github.com/gorilla/websocket"
-	"github.com/vitelabs/go-vite/log"
+	"github.com/viteshan/naive-vite/common/log"
 )
 
 type server struct {
@@ -21,6 +18,7 @@ type server struct {
 	addr     string
 	p2p      *p2p
 	bootAddr string
+	srv      *http.Server
 }
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -31,8 +29,8 @@ func (self *server) ws(w http.ResponseWriter, r *http.Request) {
 		c.WriteJSON(Req{Id: self.p2p.id, Addr: self.p2p.addr})
 		req := Req{}
 		c.ReadJSON(&req)
-		log.Info("upgrade success, add new peer.", req)
-		self.p2p.addPeer(newPeer(req.Id, req.Addr, c))
+		log.Info("upgrade success, add new peer.%v", req)
+		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))
 	} else {
 		log.Error("upgrade error.", err)
 	}
@@ -42,59 +40,16 @@ func (self *server) start() {
 	//http.HandleFunc("/ws", self.ws)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", self.ws)
-	go http.ListenAndServe(self.addr, mux)
-	go self.linkbootnode(self.bootAddr)
+	srv := &http.Server{Addr: self.addr, Handler: mux}
+	self.srv = srv
+	go srv.ListenAndServe()
 }
-func (self *server) linkbootnode(bootAddr string) {
-	u := url.URL{Scheme: "ws", Host: bootAddr, Path: "/ws"}
-	log.Info("boot node connecting to %s", u.String())
+func (self *server) loop() {
+	self.srv.ListenAndServe()
+}
 
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	if err != nil {
-		log.Error("dial:", err)
-	}
-
-	defer c.Close()
-
-	done := make(chan struct{})
-	c.WriteJSON(&Req{Id: self.id, Addr: self.addr})
-
-	go func() {
-		defer close(done)
-		for {
-			_, message, err := c.ReadMessage()
-			if err != nil {
-				log.Error("read:", err)
-				return
-			}
-			//log.Info("recv: %s", string(message))
-			res := []Req{}
-			json.Unmarshal(message, &res)
-			for _, r := range res {
-				id := r.Id
-				addr := r.Addr
-				yes := self.p2p.addDial(id, addr)
-				if yes {
-					log.Info("recv: add dial success.", strconv.Itoa(id), strconv.Itoa(self.id))
-				}
-			}
-		}
-	}()
-
-	ticker := time.NewTicker(8 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-done:
-			return
-		case <-ticker.C:
-			err := c.WriteJSON(&Req{Tp: 1})
-			if err != nil {
-				return
-			}
-		}
-	}
+func (self *server) stop() {
+	self.srv.Shutdown(context.Background())
 }
 
 type dial struct {
@@ -108,8 +63,8 @@ func (self *dial) connect(addr string) bool {
 		c.WriteJSON(Req{Id: self.p2p.id, Addr: self.p2p.addr})
 		req := Req{}
 		c.ReadJSON(&req)
-		log.Info("upgrade success, add new peer.", req)
-		self.p2p.addPeer(newPeer(req.Id, req.Addr, c))
+		log.Info("client connect success, add new peer.%v", req)
+		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))
 		return true
 	} else {
 		log.Error("dial error.", err, addr)
@@ -122,16 +77,35 @@ type p2p struct {
 	mu           sync.Mutex
 	server       *server
 	dial         *dial
+	linker       *linker
 	peers        map[int]*peer
 	pendingDials map[int]string
 	id           int
 	addr         string
+	closed       chan struct{}
+	loopWg       sync.WaitGroup
 }
 
 func (self *p2p) addPeer(peer *peer) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	self.peers[peer.id] = peer
+	old, ok := self.peers[peer.peerId]
+	if ok && old != peer {
+		log.Warn("peer exist, close old peer: %v", peer.info())
+		old.close()
+	}
+	self.peers[peer.peerId] = peer
+	go peer.loop()
+}
+
+func (self *p2p) allPeers() map[int]*peer {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	result := make(map[int]*peer, len(self.peers))
+	for k, v := range self.peers {
+		result[k] = v
+	}
+	return result
 }
 
 func (self *p2p) start(bootAddr string) {
@@ -139,12 +113,20 @@ func (self *p2p) start(bootAddr string) {
 	self.peers = make(map[int]*peer)
 	self.dial = &dial{p2p: self}
 	self.server = &server{id: self.id, addr: self.addr, bootAddr: bootAddr, p2p: self}
+	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: bootAddr, Path: "/ws"})
 	self.server.start()
+	self.linker.start()
+	go self.loop()
+}
 
-	go func() {
-		for {
-			time.Sleep(4 * time.Second)
+func (self *p2p) loop() {
+	self.loopWg.Add(1)
+	defer self.loopWg.Done()
+	for {
+		ticker := time.NewTicker(3 * time.Second)
 
+		select {
+		case <-ticker.C:
 			for i, v := range self.pendingDials {
 				_, ok := self.peers[i]
 				if !ok {
@@ -157,11 +139,25 @@ func (self *p2p) start(bootAddr string) {
 				} else {
 					log.Info("has connected for " + strconv.Itoa(self.server.id) + ":" + strconv.Itoa(i))
 				}
-
 			}
+		case <-self.closed:
+			log.Info("p2p[%d] closed.", self.id)
+			return
 		}
-	}()
+	}
 }
+
+func (self *p2p) stop() {
+	self.linker.stop()
+	for _, v := range self.peers {
+		v.stop()
+	}
+	self.server.stop()
+	close(self.closed)
+	self.loopWg.Wait()
+
+}
+
 func (self *p2p) addDial(id int, addr string) bool {
 	self.mu.Lock()
 	defer self.mu.Unlock()

@@ -9,14 +9,13 @@ import (
 	"os"
 	"os/signal"
 
-	"strconv"
-
 	"strings"
 
 	"github.com/viteshan/naive-vite/common/log"
 )
 
 type bootnode struct {
+	id     int
 	peers  map[int]*peer
 	mu     sync.Mutex
 	server *http.Server
@@ -25,42 +24,50 @@ type bootnode struct {
 func (self *bootnode) addPeer(peer *peer) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	old, ok := self.peers[peer.id]
+	old, ok := self.peers[peer.peerId]
 	if ok && old != peer {
-		log.Warn("peer exist, close old peer: %v", strconv.Itoa(peer.id))
+		log.Warn("peer exist, close old peer: %s", peer.info())
 		old.close()
 	}
-	self.peers[peer.id] = peer
+	self.peers[peer.peerId] = peer
 	go self.loopread(peer)
 }
 func (self *bootnode) removePeer(peer *peer) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	old, ok := self.peers[peer.id]
+	old, ok := self.peers[peer.peerId]
 	if ok && old == peer {
-		log.Info("remove peer %v from bootnode.", strconv.Itoa(peer.id))
+		log.Info("remove peer %v from bootnode.", peer.info())
 		old.close()
-		delete(self.peers, peer.id)
+		delete(self.peers, peer.peerId)
 	}
 }
 
 func (self *bootnode) loopread(peer *peer) {
 	conn := peer.conn
-	for !peer.closed {
-		req := Req{}
-		err := conn.ReadJSON(&req)
-		if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
-			log.Error("read message error, peer: %v", strconv.Itoa(peer.id), err)
-			break
+	defer peer.close()
+
+	for {
+		select {
+		case <-peer.closed:
+			return
+		default:
+			req := Req{}
+			err := conn.ReadJSON(&req)
+			if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+				log.Error("read message error, peer: %s, %v", peer.info(), err)
+				return
+			}
+			if err != nil {
+				log.Error("read message error, peer: %s, %v", peer.info(), err)
+				return
+			}
+			if req.Tp == 1 {
+				conn.WriteJSON(self.allPeer())
+				continue
+			}
 		}
-		if err != nil {
-			log.Error("read message error, peer: %v", strconv.Itoa(peer.id), err)
-			continue
-		}
-		if req.Tp == 1 {
-			conn.WriteJSON(self.allPeer())
-			continue
-		}
+
 	}
 }
 
@@ -102,8 +109,8 @@ func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 			log.Info("read fail.", err)
 		}
 		bytes, _ := json.Marshal(&req)
-		log.Info("upgrade success, add new peer.", string(bytes))
-		peer := newPeer(req.Id, req.Addr, c)
+		log.Info("upgrade success, add new peer. %s", string(bytes))
+		peer := newPeer(req.Id, self.id, req.Addr, c)
 		closeHandler := c.CloseHandler()
 		c.SetCloseHandler(func(code int, text string) error {
 			self.removePeer(peer)
@@ -120,7 +127,7 @@ func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 func (self *bootnode) allPeer() []*Peer {
 	var results []*Peer
 	for _, peer := range self.peers {
-		results = append(results, &Peer{Id: peer.id, Addr: peer.addr})
+		results = append(results, &Peer{Id: peer.peerId, Addr: peer.peerSrvAddr})
 	}
 	return results
 }

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/gorilla/websocket"
 	"github.com/viteshan/naive-vite/common/log"
 )
@@ -17,7 +19,7 @@ func TestBootNode(t *testing.T) {
 	b.start(s)
 	//c := make(chan int)
 	var last *websocket.Conn
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 10; i++ {
 		conn := cliBootNode(s, i)
 		if last != nil {
 			for {
@@ -82,4 +84,10 @@ func contain(conn *websocket.Conn, targetAddr string, targetId int) (bool, error
 		}
 	}
 	return result, nil
+}
+
+func TestChannel(t *testing.T) {
+	c := make(chan int)
+	_, ok := <-c
+	fmt.Println(ok)
 }
