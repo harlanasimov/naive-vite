@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"fmt"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/syncer"
@@ -279,6 +280,14 @@ func (self *chainPool) insertSnippet(c *forkedChain, snippet *snippetChain) erro
 	}
 	return nil
 }
+
+type ForkChainError struct {
+	What string
+}
+
+func (e ForkChainError) Error() string {
+	return fmt.Sprintf("%s", e.What)
+}
 func (self *chainPool) insert(c *forkedChain, wrapper *BlockForPool) error {
 	if wrapper.block.Height() == c.headHeight+1 {
 		if c.headHash == wrapper.block.PreHash() {
@@ -287,12 +296,12 @@ func (self *chainPool) insert(c *forkedChain, wrapper *BlockForPool) error {
 		} else {
 			log.Warn("account forkedChain fork, fork point height[%d],hash[%s], but next block[%s]'s preHash is [%s]",
 				c.headHeight, c.headHash, wrapper.block.Hash(), wrapper.block.PreHash())
-			return nil
+			return &ForkChainError{What:"fork chain."}
 		}
 	} else {
 		log.Warn("account forkedChain fork, fork point height[%d],hash[%s], but next block[%s]'s preHash is [%s]",
 			c.headHeight, c.headHash, wrapper.block.Hash(), wrapper.block.PreHash())
-		return nil
+		return &ForkChainError{What:"fork chain."}
 	}
 }
 func (self *chainPool) check() {
