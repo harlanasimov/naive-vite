@@ -70,50 +70,104 @@ func (self *TestBlock) String() string {
 }
 
 type TestSyncer struct {
-	pool *BcPool
+	pool   *BCPool
+	blocks map[string]*TestBlock
 }
 
 type TestChainReader struct {
-	head common.Block
+	head  common.Block
+	store map[int]common.Block
+}
+
+func (self *TestChainReader) init() {
+	self.store = make(map[int]common.Block)
+	self.head = genesis
+	self.store[genesis.height] = genesis
+}
+
+func (self *TestChainReader) getBlock(height int) common.Block {
+	return self.store[height]
 }
 
 func (self *TestChainReader) Head() common.Block {
 	return self.head
 }
 func (self *TestChainReader) insertChain(block common.Block, forkVersion int) (bool, error) {
-	log.Info("insert to chain: %s", block)
+	log.Info("insert to forkedChain: %s", block)
 	self.head = block
+	self.store[block.Height()] = block
 	return true, nil
 }
 
 func (self *TestSyncer) Fetch(hash syncer.BlockHash, prevCnt int) {
 	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
 	go func() {
-		for i := 1; i < prevCnt; i++ {
-			height := hash.Height - i
-			block := &TestBlock{hash: strconv.Itoa(height), height: height, preHash: strconv.Itoa(height - 1), signer: signer}
-			log.Info("recv from net: %s", block)
-			self.pool.addBlock(block)
+		prev := hash.Hash
+
+		for i := 0; i < prevCnt; i++ {
+			block, ok := self.blocks[prev]
+			if ok {
+				log.Info("recv from net: %s", block)
+				self.pool.addBlock(block)
+			} else {
+				return
+			}
+			prev = block.preHash
 		}
+
 	}()
 }
+
+func (self *TestSyncer) genLinkedData() {
+	self.blocks = genLinkBlock("A-", 1, 100, genesis)
+	block := self.blocks["A-5"]
+	tmp := genLinkBlock("B-", 6, 30, block)
+	for k, v := range tmp {
+		self.blocks[k] = v
+	}
+
+	block = self.blocks["A-6"]
+	tmp = genLinkBlock("C-", 7, 30, block)
+	for k, v := range tmp {
+		self.blocks[k] = v
+	}
+}
+
+func genLinkBlock(mark string, start int, end int, genesis *TestBlock) map[string]*TestBlock {
+	blocks := make(map[string]*TestBlock)
+	last := genesis
+	for i := start; i < end; i++ {
+		hash := mark + strconv.Itoa(i)
+		block := &TestBlock{hash: hash, height: i, preHash: last.Hash(), signer: signer}
+		blocks[hash] = block
+		last = block
+	}
+	return blocks
+}
+
+var genesis = &TestBlock{hash: "A-0", height: 0, preHash: "-1", signer: signer}
 
 var signer = "viteshan"
 
 func TestBcPool(t *testing.T) {
 
-	reader := &TestChainReader{head: &TestBlock{hash: "0", height: 0, preHash: "-1", signer: signer}}
-
-	testSyncer := &TestSyncer{}
-	pool := newBlockchainPool(reader.insertChain, &TestVerifier{}, testSyncer, reader, "bcPool-1")
+	reader := &TestChainReader{head: genesis}
+	reader.init()
+	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
+	testSyncer.genLinkedData()
+	pool := newBlockChainPool(reader.insertChain, &TestVerifier{}, testSyncer, reader, "bcPool-1")
 	testSyncer.pool = pool
 	pool.init()
 	pool.Start()
-	pool.addBlock(&TestBlock{hash: "5", height: 5, preHash: "4", signer: signer})
+	pool.addBlock(&TestBlock{hash: "A-6", height: 6, preHash: "A-5", signer: signer})
 	time.Sleep(time.Second)
-	pool.addBlock(&TestBlock{hash: "1", height: 1, preHash: "0", signer: signer})
+	pool.addBlock(&TestBlock{hash: "C-10", height: 10, preHash: "C-9", signer: signer})
 	time.Sleep(time.Second)
-	pool.addBlock(&TestBlock{hash: "10", height: 10, preHash: "9", signer: signer})
+	pool.addBlock(&TestBlock{hash: "A-1", height: 1, preHash: "A-0", signer: signer})
+	time.Sleep(time.Second)
+
+	pool.addBlock(&TestBlock{hash: "A-20", height: 20, preHash: "A-19", signer: signer})
+	pool.addBlock(&TestBlock{hash: "B-9", height: 9, preHash: "A-8", signer: signer})
 	c := make(chan int)
 	c <- 1
 }
