@@ -108,7 +108,7 @@ func (self *TestSyncer) Fetch(hash syncer.BlockHash, prevCnt int) {
 			block, ok := self.blocks[prev]
 			if ok {
 				log.Info("recv from net: %s", block)
-				self.pool.addBlock(block)
+				self.pool.AddBlock(block)
 			} else {
 				return
 			}
@@ -159,15 +159,15 @@ func TestBcPool(t *testing.T) {
 	testSyncer.pool = pool
 	pool.init()
 	pool.Start()
-	pool.addBlock(&TestBlock{hash: "A-6", height: 6, preHash: "A-5", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "A-6", height: 6, preHash: "A-5", signer: signer})
 	time.Sleep(time.Second)
-	pool.addBlock(&TestBlock{hash: "C-10", height: 10, preHash: "C-9", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "C-10", height: 10, preHash: "C-9", signer: signer})
 	time.Sleep(time.Second)
-	pool.addBlock(&TestBlock{hash: "A-1", height: 1, preHash: "A-0", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "A-1", height: 1, preHash: "A-0", signer: signer})
 	time.Sleep(time.Second)
 
-	pool.addBlock(&TestBlock{hash: "A-20", height: 20, preHash: "A-19", signer: signer})
-	pool.addBlock(&TestBlock{hash: "B-9", height: 9, preHash: "A-8", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "A-20", height: 20, preHash: "A-19", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "B-9", height: 9, preHash: "A-8", signer: signer})
 	c := make(chan int)
 	c <- 1
 }

@@ -8,12 +8,22 @@ import (
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/syncer"
+	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
 	"strconv"
 	"sync/atomic"
 	"time"
 )
+
+type PoolReader interface {
+	Current() ChainReader
+	Chains() []ChainReader
+}
+type ChainReader interface {
+	HeadHeight() int
+	ChainId() string
+}
 
 type chainReader interface {
 	Head() common.Block
@@ -23,6 +33,7 @@ type chainReader interface {
 type heightChainReader interface {
 	id() string
 	getBlock(height int, refer bool) *BlockForPool
+	contains(height int) bool
 }
 
 var pendingMu sync.Mutex
@@ -34,6 +45,7 @@ type BCPool struct {
 	syncer      syncer.Syncer
 	verifier    verifier.Verifier
 	chainReader chainReader
+	forkwall    tools.ForkWall
 }
 
 type blockPool struct {
@@ -78,8 +90,11 @@ func (self *diskChain) getBlock(height int, refer bool) *BlockForPool {
 	} else {
 		return &BlockForPool{block: block, forkVersion: forkVersion, verifyStat: &BlockVerifySuccessStat{}}
 	}
-
 }
+func (self *diskChain) contains(height int) bool {
+	return self.reader.Head().Height() >= height
+}
+
 func (self *diskChain) id() string {
 	return "diskChain"
 }
@@ -143,6 +158,7 @@ type forkedChain struct {
 	chain
 	// key: height
 	headHash   string
+	tailHash   string
 	referChain heightChainReader
 }
 
@@ -155,6 +171,9 @@ func (self *forkedChain) getBlock(height int, refer bool) *BlockForPool {
 		return self.referChain.getBlock(height, refer)
 	}
 	return nil
+}
+func (self *forkedChain) contains(height int) bool {
+	return height > self.tailHeight && self.headHeight <= height
 }
 
 func newBlockChainPool(
@@ -220,6 +239,15 @@ func (self *chainPool) init(initBlock common.Block) {
 	self.chains = make(map[string]*forkedChain)
 	self.snippetChains = make(map[string]*snippetChain)
 	self.chains[self.current.chainId] = self.current
+}
+
+func (self *chainPool) currentModify(initBlock common.Block) {
+	new := &forkedChain{}
+	new.chainId = self.genChainId()
+	new.init(initBlock)
+	new.referChain = self.diskChain
+	self.current = new
+	self.chains[new.chainId] = new
 }
 
 // fork, insert, forkedChain
@@ -349,7 +377,10 @@ func (self *chainPool) insert(c *forkedChain, wrapper *BlockForPool) error {
 		return &ForkChainError{What: "fork chain."}
 	}
 }
-func (self *chainPool) check() {
+func (self *chainPool) check(fw tools.ForkWall) {
+	fw.Wait()
+	fw.Add(1)
+	defer fw.Done()
 
 	self.printChains()
 
@@ -386,6 +417,11 @@ L:
 		}
 	}
 }
+
+func (self *chainPool) insertNotify(head common.Block) {
+	self.currentModify(head)
+}
+
 func (self *chainPool) writeToChain(chain *forkedChain, wrapper *BlockForPool) {
 	block := wrapper.block
 	height := block.Height()
@@ -395,6 +431,7 @@ func (self *chainPool) writeToChain(chain *forkedChain, wrapper *BlockForPool) {
 	if err == nil && result {
 		delete(chain.heightBlocks, height)
 		chain.tailHeight = height
+		chain.tailHash = hash
 		self.fixReferChange(chain, height)
 	} else {
 		log.Error("waiting pool insert forkedChain fail. height:[%d], hash:[%s]", height, hash)
@@ -425,6 +462,7 @@ func (self *chainPool) fixReferChange(target *forkedChain, fixHeight int) {
 func (self *forkedChain) init(initBlock common.Block) {
 	self.heightBlocks = make(map[int]*BlockForPool)
 	self.tailHeight = initBlock.Height()
+	self.tailHash = initBlock.Hash()
 	self.headHeight = initBlock.Height()
 	self.headHash = initBlock.Hash()
 }
@@ -594,8 +632,8 @@ func (self *blockPool) compound(w *BlockForPool) {
 	delete(self.freeBlocks, w.block.Hash())
 }
 
-func (self *BCPool) addBlock(block common.Block) {
-	stat := self.verifier.NewVerifyStat(verifier.VerifyReferred)
+func (self *BCPool) AddBlock(block common.Block) {
+	stat := self.verifier.NewVerifyStat(verifier.VerifyReferred, block)
 	wrapper := &BlockForPool{block: block, verifyStat: stat, forkVersion: -1}
 	pendingMu.Lock()
 	defer pendingMu.Unlock()
@@ -622,62 +660,17 @@ func (a ByTailHeight) Less(i, j int) bool { return a[i].tailHeight < a[j].tailHe
 
 func (self *BCPool) loop() {
 	for {
-		self.loopForsnippetChains()
-
-		sortSnippets := copyMap(self.chainpool.snippetChains)
-		sort.Sort(ByTailHeight(sortSnippets))
-
-		tmpChains := copyChains(self.chainpool.chains)
-
-		for _, w := range sortSnippets {
-			forky, insertable, c := self.chainpool.forky(w, tmpChains)
-			if forky {
-				newChain, err := self.chainpool.forkChain(c, w)
-				if err == nil {
-					//err = self.chainpool.insertSnippet(newChain, w)
-					tmpChains = append(tmpChains, newChain)
-					delete(self.chainpool.snippetChains, w.id())
-				}
-				continue
-			}
-			if insertable {
-				err := self.chainpool.insertSnippet(c, w)
-				if err != nil {
-					log.Error("insert fail. %v", err)
-				}
-				continue
-			}
-		}
-
-		sortSnippets = copyMap(self.chainpool.snippetChains)
-		sort.Sort(ByTailHeight(sortSnippets))
-
-		prev := -1
-		for _, w := range sortSnippets {
-			diff := 5
-			if prev > 0 {
-				diff = w.tailHeight - prev
-			}
-
-			if diff < 0 {
-				diff = 5
-			}
-
-			if diff > 1 {
-				hash := syncer.BlockHash{Hash: w.tailHash, Height: w.tailHeight}
-				self.syncer.Fetch(hash, diff)
-			}
-			prev = w.headHeight
-		}
-		self.chainpool.check()
+		self.loopGenSnippetChains()
+		self.loopAppendChains(self.forkwall)
+		self.loopFetchForSnippets()
+		self.chainpool.check(self.forkwall)
 		time.Sleep(time.Second)
-
 	}
 }
 func (self *BCPool) Start() {
 	go self.loop()
 }
-func (self *BCPool) loopForsnippetChains() {
+func (self *BCPool) loopGenSnippetChains() {
 	//  self.chainpool.snippetChains
 	sortPending := copyValuesFrom(self.blockpool.freeBlocks)
 	sort.Reverse(ByHeight(sortPending))
@@ -712,6 +705,63 @@ func (self *BCPool) loopForsnippetChains() {
 		final[v.id()] = v
 	}
 	self.chainpool.snippetChains = final
+}
+func (self *BCPool) AddDirectBlock(block common.Block) {
+	forkVersion := version.ForkVersion()
+	self.chainpool.insertChainFn(block, forkVersion)
+	head := self.chainReader.Head()
+	self.chainpool.insertNotify(head)
+}
+func (self *BCPool) loopAppendChains(fw tools.ForkWall) {
+	fw.Wait()
+	fw.Add(1)
+	defer fw.Done()
+	sortSnippets := copyMap(self.chainpool.snippetChains)
+	sort.Sort(ByTailHeight(sortSnippets))
+
+	tmpChains := copyChains(self.chainpool.chains)
+
+	for _, w := range sortSnippets {
+		forky, insertable, c := self.chainpool.forky(w, tmpChains)
+		if forky {
+			newChain, err := self.chainpool.forkChain(c, w)
+			if err == nil {
+				//err = self.chainpool.insertSnippet(newChain, w)
+				tmpChains = append(tmpChains, newChain)
+				delete(self.chainpool.snippetChains, w.id())
+			}
+			continue
+		}
+		if insertable {
+			err := self.chainpool.insertSnippet(c, w)
+			if err != nil {
+				log.Error("insert fail. %v", err)
+			}
+			continue
+		}
+	}
+}
+func (self *BCPool) loopFetchForSnippets() {
+	sortSnippets := copyMap(self.chainpool.snippetChains)
+	sort.Sort(ByTailHeight(sortSnippets))
+
+	prev := -1
+	for _, w := range sortSnippets {
+		diff := 5
+		if prev > 0 {
+			diff = w.tailHeight - prev
+		}
+
+		if diff < 0 {
+			diff = 5
+		}
+
+		if diff > 1 {
+			hash := syncer.BlockHash{Hash: w.tailHash, Height: w.tailHeight}
+			self.syncer.Fetch(hash, diff)
+		}
+		prev = w.headHeight
+	}
 }
 
 func splitToMap(chains []*snippetChain) map[string]*snippetChain {
@@ -765,4 +815,57 @@ func copyChains(m map[string]*forkedChain) []*forkedChain {
 		r = append(r, v)
 	}
 	return r
+}
+
+type snapshotPool struct {
+	BCPool
+	wall tools.ForkWall
+}
+
+func (self *snapshotPool) loop() {
+	for {
+		self.checkFork()
+	}
+}
+
+func (self *snapshotPool) checkFork() {
+	chains := self.chainpool.chains
+	current := self.chainpool.current
+	longest := self.longestChain(chains, current)
+	if longest.chainId == current.chainId {
+		return
+	}
+	self.snapshotFork()
+
+}
+func (self *snapshotPool) longestChain(readers map[string]*forkedChain, current *forkedChain) *forkedChain {
+	longest := current
+	for _, reader := range readers {
+		height := reader.headHeight
+		if height > longest.headHeight {
+			longest = reader
+		}
+	}
+	return longest
+}
+func (self *snapshotPool) snapshotFork(longest *forkedChain, current *forkedChain) {
+	self.wall.Wait()
+	self.wall.Add(1)
+	defer self.wall.Done()
+
+	self.modifiedAccounts(longest, current)
+}
+func (self *snapshotPool) modifiedAccounts(longest *forkedChain, current *forkedChain) {
+	curHeadHeight := current.headHeight
+
+	for {
+		block := longest.getBlock(curHeadHeight, true)
+		if block != nil {
+			curBlock := current.getBlock(curHeadHeight, true)
+			if block.block.Hash() == curBlock.block.Hash() {
+				break
+			}
+		}
+		curHeadHeight = curHeadHeight - 1
+	}
 }

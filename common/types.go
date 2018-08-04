@@ -7,3 +7,9 @@ type Block interface {
 	PreHash() string
 	Signer() string
 }
+
+type AccountHashH struct {
+	Addr   string
+	Hash   string
+	Height int
+}
