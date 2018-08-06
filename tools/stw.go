@@ -9,14 +9,22 @@ type ForkWall interface {
 }
 
 type ViteForkWall struct {
-	wg sync.WaitGroup
-	fw ForkWall
+	rw sync.RWMutex
 }
 
-func (self *ViteForkWall) Add(delta int) {
-	self.wg.Add(delta)
+
+func (self *ViteForkWall) Lock() {
+	self.rw.Lock()
 }
 
-func (self *ViteForkWall) Done() {
-	self.wg.Done()
+func (self *ViteForkWall) UnLock(delta int) {
+	self.rw.Unlock()
+}
+
+func (self *ViteForkWall) RLock() {
+	self.rw.RLock()
+}
+
+func (self *ViteForkWall) RUnLock() {
+	self.rw.RUnlock()
 }
