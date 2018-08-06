@@ -39,15 +39,16 @@ func (self *TestVerifier) VerifyReferred(block common.Block, stat verifier.Block
 	}
 }
 
-func (self *TestVerifier) NewVerifyStat(t verifier.VerifyType) verifier.BlockVerifyStat {
+func (self *TestVerifier) NewVerifyStat(t verifier.VerifyType, block common.Block) verifier.BlockVerifyStat {
 	return &TestBlockVerifyStat{result: verifier.NONE}
 }
 
 type TestBlock struct {
-	hash    string
-	height  int
-	preHash string
-	signer  string
+	hash      string
+	height    int
+	preHash   string
+	signer    string
+	timestamp time.Time
 }
 
 func (self *TestBlock) Height() int {
@@ -65,6 +66,9 @@ func (self *TestBlock) PreHash() string {
 func (self *TestBlock) Signer() string {
 	return self.signer
 }
+func (self *TestBlock) Timestamp() time.Time {
+	return self.timestamp
+}
 func (self *TestBlock) String() string {
 	return "height:[" + strconv.Itoa(self.height) + "]\thash:[" + self.hash + "]\tpreHash:[" + self.preHash + "]\tsigner:[" + self.signer + "]"
 }
@@ -79,14 +83,14 @@ type TestChainReader struct {
 	store map[int]common.Block
 }
 
+func (self *TestChainReader) GetBlock(height int) common.Block {
+	return self.store[height]
+}
+
 func (self *TestChainReader) init() {
 	self.store = make(map[int]common.Block)
 	self.head = genesis
 	self.store[genesis.height] = genesis
-}
-
-func (self *TestChainReader) getBlock(height int) common.Block {
-	return self.store[height]
 }
 
 func (self *TestChainReader) Head() common.Block {
@@ -99,6 +103,12 @@ func (self *TestChainReader) insertChain(block common.Block, forkVersion int) (b
 	return true, nil
 }
 
+func (self *TestChainReader) removeChain(block common.Block) (bool, error) {
+	log.Info("remove from forkedChain: %s", block)
+	self.head = self.store[block.Height()-1]
+	delete(self.store, block.Height())
+	return true, nil
+}
 func (self *TestSyncer) Fetch(hash syncer.BlockHash, prevCnt int) {
 	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
 	go func() {
@@ -145,7 +155,7 @@ func genLinkBlock(mark string, start int, end int, genesis *TestBlock) map[strin
 	return blocks
 }
 
-var genesis = &TestBlock{hash: "A-0", height: 0, preHash: "-1", signer: signer}
+var genesis = &TestBlock{hash: "A-0", height: 0, preHash: "-1", signer: signer, timestamp: time.Now()}
 
 var signer = "viteshan"
 
@@ -155,24 +165,24 @@ func TestBcPool(t *testing.T) {
 	reader.init()
 	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
 	testSyncer.genLinkedData()
-	pool := newBlockChainPool(reader.insertChain, &TestVerifier{}, testSyncer, reader, "bcPool-1")
+	pool := newBlockChainPool("bcPool-1")
 	testSyncer.pool = pool
-	pool.init()
-	pool.Start()
-	pool.AddBlock(&TestBlock{hash: "A-6", height: 6, preHash: "A-5", signer: signer})
+	pool.init(reader.insertChain, reader.removeChain, &TestVerifier{}, testSyncer, reader)
+	go pool.loop()
+	pool.AddBlock(&TestBlock{hash: "A-6", height: 6, preHash: "A-5", signer: signer, timestamp: time.Now()})
 	time.Sleep(time.Second)
-	pool.AddBlock(&TestBlock{hash: "C-10", height: 10, preHash: "C-9", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "C-10", height: 10, preHash: "C-9", signer: signer, timestamp: time.Now()})
 	time.Sleep(time.Second)
-	pool.AddBlock(&TestBlock{hash: "A-1", height: 1, preHash: "A-0", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "A-1", height: 1, preHash: "A-0", signer: signer, timestamp: time.Now()})
 	time.Sleep(time.Second)
 
-	pool.AddBlock(&TestBlock{hash: "A-20", height: 20, preHash: "A-19", signer: signer})
-	pool.AddBlock(&TestBlock{hash: "B-9", height: 9, preHash: "A-8", signer: signer})
+	pool.AddBlock(&TestBlock{hash: "A-20", height: 20, preHash: "A-19", signer: signer, timestamp: time.Now()})
+	pool.AddBlock(&TestBlock{hash: "B-9", height: 9, preHash: "A-8", signer: signer, timestamp: time.Now()})
 	c := make(chan int)
 	c <- 1
 }
 
 func TestInsertChain(t *testing.T) {
-	reader := &TestChainReader{head: &TestBlock{hash: "1", height: 1, preHash: "0", signer: signer}}
-	reader.insertChain(&TestBlock{hash: "1", height: 1, preHash: "0", signer: "viteshan"}, 1)
+	reader := &TestChainReader{head: &TestBlock{hash: "1", height: 1, preHash: "0", signer: signer, timestamp: time.Now()}}
+	reader.insertChain(&TestBlock{hash: "1", height: 1, preHash: "0", signer: "viteshan", timestamp: time.Now()}, 1)
 }
