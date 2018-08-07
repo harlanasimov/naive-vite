@@ -211,7 +211,7 @@ func (self *BCPool) init(insertChainFn insertChainForkCheck,
 
 	diskChain := &diskChain{reader: reader}
 	chainpool := &chainPool{
-		poolId:        "chainPool",
+		poolId:        self.Id,
 		insertChainFn: insertChainFn,
 		removeChainFn: removeChainFn,
 		verifier:      verifier,
@@ -500,16 +500,18 @@ func (self *chainPool) writeToChain(chain *forkedChain, wrapper *BlockForPool) {
 	}
 }
 func (self *chainPool) printChains() {
-	log.Info("----------------------------------")
+	result := "\n---------------" + self.poolId + "--start-----------------\n"
 	chains := copyChains(self.chains)
 	for _, c := range chains {
 		if c.chainId == self.current.chainId {
-			log.Info("%s [current]", c)
+			result = result + c.String() + " [current]\n"
 		} else {
-			log.Info("%s ", c)
+			result = result + c.String() + "\n"
 		}
 
 	}
+	result = result + "---------------" + self.poolId + "--end-----------------\n"
+	log.Info(result)
 }
 
 //func (self *chainPool) fixReferInsert(origin heightChainReader, target heightChainReader, fixHeight int) {
@@ -576,7 +578,10 @@ func (self *forkedChain) addTail(w *BlockForPool) {
 }
 
 func (self *forkedChain) String() string {
-	return self.chainId + "\t" + strconv.Itoa(self.headHeight) + "[" + self.headHash + "]\t" + strconv.Itoa(self.tailHeight)
+	return "chainId:\t" + self.chainId + "\n" +
+		"headHeight:\t" + strconv.Itoa(self.headHeight) + "\n" +
+		"headHash:\t" + "[" + self.headHash + "]\t" + "\n" +
+		"tailHeight:\t" + strconv.Itoa(self.tailHeight)
 }
 
 //

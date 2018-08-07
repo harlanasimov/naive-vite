@@ -17,15 +17,14 @@ func calculateHash(s string) string {
 }
 
 func CalculateAccountHash(block *common.AccountStateBlock) string {
-	return blockStr(block) + strconv.Itoa(block.Amount) +
+	return calculateHash(blockStr(block) + strconv.Itoa(block.Amount) +
 		strconv.Itoa(block.ModifiedAmount) +
 		strconv.Itoa(block.SnapshotHeight) +
 		block.SnapshotHash +
 		block.BlockType.String() +
 		block.From +
 		block.To +
-		block.SourceHash
-
+		block.SourceHash)
 }
 
 func blockStr(block common.Block) string {
