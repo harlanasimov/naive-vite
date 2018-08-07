@@ -198,7 +198,7 @@ func (self *AccountBlockVerifyStat) VerifyResult() VerifyResult {
 	if self.referredSelfResult == SUCCESS &&
 		self.referredFromResult == SUCCESS &&
 		self.referredSnapshotResult == SUCCESS {
-		return FAIL
+		return SUCCESS
 	}
 	return PENDING
 }
@@ -213,7 +213,7 @@ func (self *AccountVerifier) NewVerifyStat(t VerifyType, block common.Block) Blo
 	return &AccountBlockVerifyStat{}
 }
 func (self *AccountVerifier) checkSelfAmount(block *common.AccountStateBlock) VerifyResult {
-	last := self.accountReader.GetByHFromChain(block.To, block.Height()-1)
+	last := self.accountReader.GetByHFromChain(block.Signer(), block.Height()-1)
 
 	if last == nil {
 		return PENDING

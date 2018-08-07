@@ -26,6 +26,8 @@ func NewSnapshotChain() *Snapshotchain {
 	chain.snapshotDB = make(map[string]*common.SnapshotBlock)
 	chain.snapshotHeightDB = make(map[int]*common.SnapshotBlock)
 	chain.head = genesisSnapshot
+	chain.snapshotDB[chain.head.Hash()] = chain.head
+	chain.snapshotHeightDB[chain.head.Height()] = chain.head
 	return chain
 }
 
@@ -45,7 +47,15 @@ func (self *Snapshotchain) Head() common.Block {
 }
 
 func (self *Snapshotchain) GetBlock(height int) common.Block {
-	return self.snapshotHeightDB[height]
+	if height < 0 {
+		log.Error("can't request height 0 block.[snapshotChain]")
+		return nil
+	}
+	block, ok := self.snapshotHeightDB[height]
+	if !ok {
+		return nil
+	}
+	return block
 }
 
 func (self *Snapshotchain) insertChain(b common.Block, forkVersion int) (bool, error) {
