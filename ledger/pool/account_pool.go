@@ -53,7 +53,7 @@ func (self *AccountPool) ForkAccount(target *common.AccountHashH) error {
 
 // rollback to current
 func (self *AccountPool) rollbackDisk(height int, hash string) error {
-	head := self.ChainReader.Head().(*common.AccountStateBlock)
+	head := self.chainpool.diskChain.Head().(*common.AccountStateBlock)
 	if head.SnapshotHeight < height {
 		return nil
 	}

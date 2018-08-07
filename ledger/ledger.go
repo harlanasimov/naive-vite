@@ -5,10 +5,8 @@ import (
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/syncer"
-	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
 	"sync"
-	"time"
 )
 
 type Ledger interface {
@@ -19,20 +17,46 @@ type Ledger interface {
 	// from other peer
 	AddAccountBlock(account string, block *common.AccountStateBlock)
 	// from self
-	MiningAccountBlock(address string, block *common.SnapshotBlock)
+	MiningAccountBlock(address string, block *common.AccountStateBlock) error
 	// create account genesis block
 	CreateAccount(address string) error
+	HeadAccount(address string) (*common.AccountStateBlock, error)
+	HeadSnaphost() (*common.SnapshotBlock, error)
 }
 
 type ledger struct {
-	ac               map[string]*AccountChain
-	sc               *Snapshotchain
-	pendingSc        *pool.SnapshotPool
-	pendingAc        map[string]*pool.AccountPool
+	ac        map[string]*AccountChain
+	sc        *Snapshotchain
+	pendingSc *pool.SnapshotPool
+	pendingAc map[string]*pool.AccountPool
+	reqPool   *reqPool
+
 	snapshotVerifier *verifier.SnapshotVerifier
 	accountVerifier  *verifier.AccountVerifier
 	syncer           syncer.Syncer
 	rwMutex          *sync.RWMutex
+}
+
+func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, error) {
+	ac := self.selfAc(address)
+	if ac == nil {
+		return nil, common.StrError{"account not exist."}
+	}
+	head := ac.Head()
+	if head == nil {
+		return nil, common.StrError{"head not exist."}
+	}
+	block := head.(*common.AccountStateBlock)
+	return block, nil
+}
+
+func (self *ledger) HeadSnaphost() (*common.SnapshotBlock, error) {
+	head := self.sc.Head()
+	if head == nil {
+		return nil, common.StrError{"head not exist."}
+	}
+	block := head.(*common.SnapshotBlock)
+	return block, nil
 }
 
 func (self *ledger) CreateAccount(address string) error {
@@ -41,7 +65,7 @@ func (self *ledger) CreateAccount(address string) error {
 		log.Warn("exist account for %s.", address)
 		return common.StrError{"exist account " + address}
 	}
-	accountChain := NewAccountChain(address, head.Height(), head.Hash())
+	accountChain := NewAccountChain(address, self.reqPool, head.Height(), head.Hash())
 	accountPool := pool.NewAccountPool("accountChainPool-" + address)
 	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, self.syncer, accountChain, self.rwMutex.RLocker(), accountChain)
 	self.ac[address] = accountChain
@@ -62,8 +86,8 @@ func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBl
 	self.selfPendingAc(account).AddBlock(block)
 }
 
-func (self *ledger) MiningAccountBlock(account string, block *common.SnapshotBlock) {
-	self.selfPendingAc(account).AddDirectBlock(block)
+func (self *ledger) MiningAccountBlock(account string, block *common.AccountStateBlock) error {
+	return self.selfPendingAc(account).AddDirectBlock(block)
 }
 
 func (self *ledger) selfAc(addr string) *AccountChain {
@@ -105,12 +129,13 @@ func NewLedger(syncer syncer.Syncer) *ledger {
 		sc,
 		ledger.rwMutex,
 		ledger)
+	ledger.reqPool = newReqPool()
 
 	acPools := make(map[string]*pool.AccountPool)
 	acs := make(map[string]*AccountChain)
 	accounts := Accounts()
 	for _, account := range accounts {
-		ac := NewAccountChain(account, sc.head.Height(), sc.head.Hash())
+		ac := NewAccountChain(account, ledger.reqPool, sc.head.Height(), sc.head.Hash())
 		accountPool := pool.NewAccountPool("accountChainPool-" + account)
 		accountPool.Init(ac.insertChain, ac.removeChain, ledger.accountVerifier, ledger.syncer, ac, ledger.rwMutex.RLocker(), ac)
 		acs[account] = ac
@@ -125,7 +150,11 @@ func NewLedger(syncer syncer.Syncer) *ledger {
 }
 
 func (self *ledger) GetFromChain(account string, hash string) *common.AccountStateBlock {
-	return nil
+	b := self.selfAc(account).GetBlockByHash(hash)
+	if b == nil {
+		return nil
+	}
+	return b.(*common.AccountStateBlock)
 }
 func (self *ledger) GetByHFromChain(account string, height int) *common.AccountStateBlock {
 	b := self.selfAc(account).GetBlock(height)
@@ -149,26 +178,3 @@ func (self *ledger) Start() {
 func Accounts() []string {
 	return []string{"viteshan1", "viteshan2", "viteshan3"}
 }
-func GenAccountBlock(address string) *common.AccountStateBlock {
-	//height int,
-	//	hash string,
-	//	preHash string,
-	//	signer string,
-	//	timestamp time.Time,
-	//
-	//	amount int,
-	//	modifiedAmount int,
-	//	snapshotHeight int,
-	//	snapshotHash string,
-	//	blockType BlockType,
-	//	from string,
-	//	to string,
-	//	sourceHash string,
-	block := common.NewAccountBlock(0, "", "", address, time.Unix(1533550878, 0),
-		0, 0, 0, "460780b73084275422b520a42ebb9d4f8a8326e1522c79817a19b41ba69dca5b", common.CREATE, "", address, "")
-	hash := tools.CalculateAccountHash(block)
-	block.SetHash(hash)
-	return block
-}
-
-//1533550878

@@ -22,14 +22,17 @@ type AccountChain struct {
 var blank = common.NewAccountBlock(-1, "", "", "", time.Unix(1533550870, 0),
 	0, 0, GetGenesisSnapshot().Height(), GetGenesisSnapshot().Hash(), common.CREATE, "", "", "")
 
-func NewAccountChain(address string, snapshotHeight int, snapshotHash string) *AccountChain {
+func NewAccountChain(address string, reqPool *reqPool, snapshotHeight int, snapshotHash string) *AccountChain {
 	self := &AccountChain{}
 	self.address = address
 	self.head = common.NewAccountBlock(0, "", "", address, time.Now(),
-		0, 0, snapshotHeight, snapshotHash, common.CREATE, address, address, "")
+		100, 0, snapshotHeight, snapshotHash, common.CREATE, address, address, "")
 	self.head.SetHash(tools.CalculateAccountHash(self.head))
 	self.accountDB = make(map[string]*common.AccountStateBlock)
 	self.accountHeightDB = make(map[int]*common.AccountStateBlock)
+	self.accountDB[self.head.Hash()] = self.head
+	self.accountHeightDB[self.head.Height()] = self.head
+	self.reqPool = reqPool
 	return self
 }
 
@@ -38,18 +41,21 @@ func (self *AccountChain) SetPending(pool *pool.AccountPool) {
 }
 
 func (self *AccountChain) Head() common.Block {
-	if self.head == nil {
-
-	}
 	return self.head
 }
 
 func (self *AccountChain) GetBlock(height int) common.Block {
+	if height == -1 {
+		return blank
+	}
 	if height < 0 {
 		log.Error("can't request height 0 block. account:%s", self.address)
 		return nil
 	}
 	return self.accountHeightDB[height]
+}
+func (self *AccountChain) GetBlockByHash(hash string) common.Block {
+	return self.accountDB[hash]
 }
 
 func (self *AccountChain) insertChain(b common.Block, forkVersion int) (bool, error) {
@@ -69,11 +75,7 @@ func (self *AccountChain) removeChain(b common.Block) (bool, error) {
 	delete(self.accountDB, block.Hash())
 	delete(self.accountHeightDB, block.Height())
 	self.reqPool.blockRollback(block)
-	if head == nil && block.PreHash() == "" && block.Height() == 0 {
-		self.head = blank
-	} else {
-		self.head = head
-	}
+	self.head = head
 	return true, nil
 }
 

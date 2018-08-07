@@ -63,6 +63,57 @@ func TestLedger(t *testing.T) {
 	ledger.Start()
 
 	ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
+	viteshan := "viteshan"
+	reqs := ledger.reqPool.getReqs(viteshan)
+	if len(reqs) > 0 {
+		t.Errorf("reqs should be empty. reqs:%v", reqs)
+	}
+
+	viteshan1 := "viteshan1"
+	ledger.CreateAccount(viteshan)
+	time.Sleep(2 * time.Second)
+	snapshotBlock, _ := ledger.HeadSnaphost()
+	headAccount, _ := ledger.HeadAccount(viteshan1)
+
+	block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
+		0, -105, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
+	block.SetHash(tools.CalculateAccountHash(block))
+	var err error
+	err = ledger.MiningAccountBlock(viteshan1, block)
+	if err == nil {
+		t.Error("expected error.")
+	} else {
+		log.Info("error:%v", err)
+	}
+
+	block = common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
+		10, -90, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
+	block.SetHash(tools.CalculateAccountHash(block))
+
+	err = ledger.MiningAccountBlock(viteshan1, block)
+	if err != nil {
+		t.Errorf("expected error.%v", err)
+
+	}
+
+	reqs = ledger.reqPool.getReqs(viteshan)
+	if len(reqs) != 1 {
+		t.Errorf("reqs should be empty. reqs:%v", reqs)
+	}
+	req := reqs[0]
+
+	headAcc, _ := ledger.HeadAccount(viteshan)
+
+	block = common.NewAccountBlock(1, "", headAcc.Hash(), viteshan, time.Unix(1533550878, 0),
+		190, 90, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, viteshan1, viteshan, req.reqHash)
+
+	block.SetHash(tools.CalculateAccountHash(block))
+
+	err = ledger.MiningAccountBlock(viteshan, block)
+	if err != nil {
+		t.Errorf("expected error.%v", err)
+	}
+
 	time.Sleep(10 * time.Second)
 }
 func genSnapshotBlock(ledger *ledger) *common.SnapshotBlock {
