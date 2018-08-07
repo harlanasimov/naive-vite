@@ -15,7 +15,7 @@ type Ledger interface {
 	// from other peer
 	AddSnapshotBlock(block *common.SnapshotBlock)
 	// from self
-	MiningSnapshotBlock(block *common.SnapshotBlock)
+	MiningSnapshotBlock(address string, timestamp uint64) error
 	// from other peer
 	AddAccountBlock(account string, block *common.AccountStateBlock)
 	// from self
@@ -53,8 +53,9 @@ func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
 	self.pendingSc.AddBlock(block)
 }
 
-func (self *ledger) MiningSnapshotBlock(block *common.SnapshotBlock) {
-	self.pendingSc.AddDirectBlock(block)
+func (self *ledger) MiningSnapshotBlock(address string, timestamp uint64) error {
+	//self.pendingSc.AddDirectBlock(block)
+	return nil
 }
 
 func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) {

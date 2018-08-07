@@ -106,6 +106,7 @@ func (self *SnapshotPool) loop() {
 }
 func (self *SnapshotPool) Start() {
 	go self.loop()
+	go self.loopCheckFork()
 }
 
 func (self *SnapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.BlockVerifyStat) {

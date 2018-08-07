@@ -1,6 +1,8 @@
 package common
 
-import "time"
+import (
+	"time"
+)
 
 type Block interface {
 	Height() int
@@ -43,7 +45,6 @@ func (self BlockType) String() string {
 }
 
 type block struct {
-	Block
 	height    int
 	hash      string
 	preHash   string
@@ -107,6 +108,16 @@ func NewSnapshotBlock(
 	block.timestamp = timestamp
 	block.Accounts = accounts
 	return block
+}
+
+type Address []byte
+
+func HexToAddress(hexStr string) Address {
+	return []byte(hexStr)
+}
+
+func (self *Address) String() string {
+	return string((*self)[:])
 }
 
 func NewAccountBlock(

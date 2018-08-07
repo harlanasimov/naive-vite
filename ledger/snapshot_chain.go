@@ -45,7 +45,7 @@ func (self *Snapshotchain) GetBlock(height int) common.Block {
 }
 
 func (self *Snapshotchain) insertChain(b common.Block, forkVersion int) (bool, error) {
-	log.Info("insert to snapshot Chain: %s", b)
+	log.Info("insert to snapshot Chain: %v", b)
 	block := b.(*common.SnapshotBlock)
 	self.snapshotDB[block.Hash()] = block
 	self.snapshotHeightDB[block.Height()] = block
