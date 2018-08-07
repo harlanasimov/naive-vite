@@ -1,9 +1,10 @@
 package miner
 
 import (
-	"github.com/vitelabs/go-vite/common/types"
-	"github.com/vitelabs/go-vite/consensus"
-	"github.com/vitelabs/go-vite/ledger"
+	"github.com/asaskevich/EventBus"
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/consensus"
+	"github.com/viteshan/naive-vite/ledger"
 	"strconv"
 	"testing"
 	"time"
@@ -18,41 +19,31 @@ func (SnapshotRW) MiningSnapshotBlock(address string, timestamp int64) error {
 	return nil
 }
 
-func (self *SnapshotRW) funcDownloaderRegister(ch chan<- int) {
-	self.Ch = ch
-}
-
-func (self *SnapshotRW) funcDownloaderRegisterAuto(ch chan<- int) {
-	self.Ch = ch
-	go func() {
-		time.Sleep(1 * time.Second)
-		self.Ch <- 0
-	}()
-}
-
-func genMiner(committee *consensus.Committee) (*Miner, *SnapshotRW) {
-	coinbase, _ := types.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
+func genMiner(committee *consensus.Committee) (*Miner, EventBus.Bus) {
+	bus := EventBus.New()
+	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}
-	miner := NewMiner(rw, rw.funcDownloaderRegister, coinbase, committee)
-	return miner, rw
+	miner := NewMiner(rw, bus, coinbase, committee)
+	return miner, bus
 }
 
-func genMinerAuto(committee *consensus.Committee) (*Miner, *SnapshotRW) {
-	coinbase, _ := types.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
+func genMinerAuto(committee *consensus.Committee) (*Miner, EventBus.Bus) {
+	bus := EventBus.New()
+	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}
-	miner := NewMiner(rw, rw.funcDownloaderRegisterAuto, coinbase, committee)
-	return miner, rw
+	miner := NewMiner(rw, bus, coinbase, committee)
+	return miner, bus
 }
 
 func genCommitee() *consensus.Committee {
-	genesisTime := time.Unix(int64(ledger.GetSnapshotGenesisBlock().Timestamp), 0)
+	genesisTime := ledger.GetGenesisSnapshot().Timestamp()
 	committee := consensus.NewCommittee(genesisTime, 1, int32(len(consensus.DefaultMembers)))
 	return committee
 }
 
 func TestNewMiner(t *testing.T) {
 	committee := genCommitee()
-	miner, rw := genMiner(committee)
+	miner, bus := genMiner(committee)
 
 	committee.Init()
 	miner.Init()
@@ -64,7 +55,7 @@ func TestNewMiner(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		println("timeout and downloader finish.")
 		//miner.downloaderRegisterCh <- 0
-		rw.Ch <- 0
+		bus.Publish(common.DwlDone)
 		println("-----------timeout")
 	}
 	c <- 0
@@ -72,10 +63,11 @@ func TestNewMiner(t *testing.T) {
 func TestVerifier(t *testing.T) {
 	committee := genCommitee()
 
-	coinbase, _ := types.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
-	verify, _ := committee.Verify(SnapshotRW{}, &ledger.SnapshotBlock{Producer: &coinbase, Timestamp: uint64(1532504321)})
+	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
+
+	verify, _ := committee.Verify(SnapshotRW{}, common.NewSnapshotBlock(0, "", "", coinbase.String(), time.Unix(1532504321, 0), nil))
 	println(verify)
-	verify2, _ := committee.Verify(SnapshotRW{}, &ledger.SnapshotBlock{Producer: &coinbase, Timestamp: uint64(1532504320)})
+	verify2, _ := committee.Verify(SnapshotRW{}, common.NewSnapshotBlock(0, "", "", coinbase.String(), time.Unix(1532504320, 0), nil))
 	println(verify2)
 }
 
@@ -111,11 +103,12 @@ func TestChan(t *testing.T) {
 
 func TestLifecycle(t *testing.T) {
 	commitee := genCommitee()
-	miner, _ := genMinerAuto(commitee)
+	miner, bus := genMinerAuto(commitee)
 
 	commitee.Init()
 	miner.Init()
 
+	bus.Publish(common.DwlDone)
 	commitee.Start()
 
 	miner.Start()

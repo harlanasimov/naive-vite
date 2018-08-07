@@ -1,9 +1,11 @@
 package miner
 
 import (
+	"github.com/asaskevich/EventBus"
 	"github.com/vitelabs/go-vite/common/types"
-	"github.com/vitelabs/go-vite/consensus"
-	"github.com/vitelabs/go-vite/log"
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/consensus"
 	"sync/atomic"
 	"time"
 )
@@ -43,25 +45,23 @@ func (self *MinerLifecycle) PostStart() bool {
 
 type Miner struct {
 	MinerLifecycle
-	chain                SnapshotChainRW
-	mining               int32
-	coinbase             types.Address // address
-	worker               *worker
-	committee            *consensus.Committee
-	mem                  *consensus.SubscribeMem
-	downloaderRegister   DownloaderRegister
-	downloaderRegisterCh chan int
-	dwlFinished          bool
+	chain       SnapshotChainRW
+	mining      int32
+	coinbase    common.Address // address
+	worker      *worker
+	committee   *consensus.Committee
+	mem         *consensus.SubscribeMem
+	bus         EventBus.Bus
+	dwlFinished bool
 }
 
-func NewMiner(chain SnapshotChainRW, downloaderRegister DownloaderRegister, coinbase types.Address, committee *consensus.Committee) *Miner {
+func NewMiner(chain SnapshotChainRW, bus EventBus.Bus, coinbase common.Address, committee *consensus.Committee) *Miner {
 	miner := &Miner{chain: chain, coinbase: coinbase}
 
 	miner.committee = committee
 	miner.mem = &consensus.SubscribeMem{Mem: miner.coinbase, Notify: make(chan time.Time)}
 	miner.worker = &worker{chain: chain, workChan: miner.mem.Notify, coinbase: coinbase}
-	miner.downloaderRegister = downloaderRegister
-	miner.downloaderRegisterCh = make(chan int)
+	miner.bus = bus
 	miner.dwlFinished = false
 	return miner
 }
@@ -69,21 +69,12 @@ func (self *Miner) Init() {
 	self.PreInit()
 	defer self.PostInit()
 	self.worker.Init()
-	self.downloaderRegister(self.downloaderRegisterCh)
-	go func() {
-		select {
-		// Handle ChainHeadEvent
-		case event := <-self.downloaderRegisterCh:
-			if event == 0 {
-				log.Info("downloader success.")
-				self.dwlFinished = true
-				self.committee.Subscribe(self.mem)
-			} else {
-				log.Error("downloader error.")
-			}
-
-		}
-	}()
+	dwlDownFn := func() {
+		log.Info("downloader success.")
+		self.dwlFinished = true
+		self.committee.Subscribe(self.mem)
+	}
+	self.bus.SubscribeOnce(common.DwlDone, dwlDownFn)
 }
 
 func (self *Miner) Start() {

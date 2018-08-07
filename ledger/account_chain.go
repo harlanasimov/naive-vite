@@ -15,7 +15,7 @@ type AccountChain struct {
 	accountHeightDB map[int]*common.AccountStateBlock
 	pending         *pool.AccountPool
 
-	txpool *txpool
+	txpool *reqPool
 }
 
 func NewAccountChain(address string, snapshotHeight int, snapshotHash string) *AccountChain {

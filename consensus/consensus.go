@@ -12,7 +12,7 @@ type SnapshotHeader struct {
 	Producer  common.Address
 }
 
-type Verifier interface {
+type ConsensusVerifier interface {
 	Verify(reader SnapshotReader, block *common.SnapshotBlock) (bool, error)
 }
 

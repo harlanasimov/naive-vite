@@ -1,7 +1,7 @@
 package miner
 
 import (
-	"github.com/vitelabs/go-vite/common/types"
+	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"sync"
 	"time"
@@ -12,7 +12,7 @@ type worker struct {
 	MinerLifecycle
 	workChan <-chan time.Time
 	chain    SnapshotChainRW
-	coinbase types.Address
+	coinbase common.Address
 	mu       sync.Mutex
 	updateWg sync.WaitGroup
 	updateCh chan int // update goroutine closed event chan
