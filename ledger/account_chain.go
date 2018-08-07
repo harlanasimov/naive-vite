@@ -16,7 +16,7 @@ type AccountChain struct {
 	accountHeightDB map[int]*common.AccountStateBlock
 	pending         *pool.AccountPool
 
-	txpool *reqPool
+	reqPool *reqPool
 }
 
 var blank = common.NewAccountBlock(-1, "", "", "", time.Unix(1533550870, 0),
@@ -58,6 +58,7 @@ func (self *AccountChain) insertChain(b common.Block, forkVersion int) (bool, er
 	self.accountDB[block.Hash()] = block
 	self.accountHeightDB[block.Height()] = block
 	self.head = block
+	self.reqPool.blockInsert(block)
 	return true, nil
 }
 func (self *AccountChain) removeChain(b common.Block) (bool, error) {
@@ -67,6 +68,7 @@ func (self *AccountChain) removeChain(b common.Block) (bool, error) {
 	head := self.accountDB[block.PreHash()]
 	delete(self.accountDB, block.Hash())
 	delete(self.accountHeightDB, block.Height())
+	self.reqPool.blockRollback(block)
 	if head == nil && block.PreHash() == "" && block.Height() == 0 {
 		self.head = blank
 	} else {
