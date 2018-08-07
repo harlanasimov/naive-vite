@@ -4,6 +4,8 @@ import (
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
+	"github.com/viteshan/naive-vite/tools"
+	"time"
 )
 
 // account block chain
@@ -16,7 +18,24 @@ type AccountChain struct {
 	txpool *txpool
 }
 
+func NewAccountChain(address string, snapshotHeight int, snapshotHash string) *AccountChain {
+	self := &AccountChain{}
+	self.head = common.NewAccountBlock(0, "", "", address, time.Unix(1533550878, 0),
+		0, 0, snapshotHeight, snapshotHash, common.CREATE, address, address, "")
+	self.head.SetHash(tools.CalculateAccountHash(self.head))
+	self.accountDB = make(map[string]*common.AccountStateBlock)
+	self.accountHeightDB = make(map[int]*common.AccountStateBlock)
+	return self
+}
+
+func (self *AccountChain) SetPending(pool *pool.AccountPool) {
+	self.pending = pool
+}
+
 func (self *AccountChain) Head() common.Block {
+	if self.head == nil {
+
+	}
 	return self.head
 }
 

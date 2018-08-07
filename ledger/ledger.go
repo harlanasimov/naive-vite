@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/tools"
@@ -12,35 +13,55 @@ import (
 
 type Ledger interface {
 	// from other peer
-	addSnapshotBlock(block *common.SnapshotBlock)
+	AddSnapshotBlock(block *common.SnapshotBlock)
 	// from self
-	miningSnapshotBlock(block *common.SnapshotBlock)
+	MiningSnapshotBlock(block *common.SnapshotBlock)
 	// from other peer
-	addAccountBlock(account string, block *common.AccountStateBlock)
+	AddAccountBlock(account string, block *common.AccountStateBlock)
 	// from self
-	miningAccountBlock(block *common.SnapshotBlock)
+	MiningAccountBlock(address string, block *common.SnapshotBlock)
+	// create account genesis block
+	CreateAccount(address string) error
 }
 
 type ledger struct {
-	ac        map[string]*AccountChain
-	sc        *Snapshotchain
-	pendingSc *pool.SnapshotPool
-	pendingAc map[string]*pool.AccountPool
+	ac               map[string]*AccountChain
+	sc               *Snapshotchain
+	pendingSc        *pool.SnapshotPool
+	pendingAc        map[string]*pool.AccountPool
+	snapshotVerifier *verifier.SnapshotVerifier
+	accountVerifier  *verifier.AccountVerifier
+	syncer           syncer.Syncer
+	rwMutex          *sync.RWMutex
 }
 
-func (self *ledger) addSnapshotBlock(block *common.SnapshotBlock) {
+func (self *ledger) CreateAccount(address string) error {
+	head := self.sc.Head()
+	if self.ac[address] != nil {
+		log.Warn("exist account for %s.", address)
+		return common.StrError{"exist account " + address}
+	}
+	accountChain := NewAccountChain(address, head.Height(), head.Hash())
+	accountPool := pool.NewAccountPool("accountChainPool-" + address)
+	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, self.syncer, accountChain, self.rwMutex.RLocker(), accountChain)
+	self.ac[address] = accountChain
+	self.pendingAc[address] = accountPool
+	return nil
+}
+
+func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
 	self.pendingSc.AddBlock(block)
 }
 
-func (self *ledger) miningSnapshotBlock(block *common.SnapshotBlock) {
+func (self *ledger) MiningSnapshotBlock(block *common.SnapshotBlock) {
 	self.pendingSc.AddDirectBlock(block)
 }
 
-func (self *ledger) addAccountBlock(account string, block *common.AccountStateBlock) {
+func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) {
 	self.selfPendingAc(account).AddBlock(block)
 }
 
-func (self *ledger) miningAccountBlock(account string, block *common.SnapshotBlock) {
+func (self *ledger) MiningAccountBlock(account string, block *common.SnapshotBlock) {
 	self.selfPendingAc(account).AddDirectBlock(block)
 }
 
@@ -66,36 +87,35 @@ func (self *ledger) ForkAccountTo(h *common.AccountHashH) error {
 	return self.selfPendingAc(h.Addr).ForkAccount(h)
 }
 
-func newLedger(syncer syncer.Syncer) *ledger {
-	rwMutex := new(sync.RWMutex)
+func NewLedger(syncer syncer.Syncer) *ledger {
 	ledger := &ledger{}
+	ledger.rwMutex = new(sync.RWMutex)
 
-	sc := &Snapshotchain{}
-	sc.head = genesisSnapshot
-
-	snapshotVerifier := verifier.NewSnapshotVerifier(sc, ledger)
-	accountVerifier := verifier.NewAccountVerifier(sc, ledger)
+	sc := NewSnapshotChain()
+	ledger.snapshotVerifier = verifier.NewSnapshotVerifier(sc, ledger)
+	ledger.accountVerifier = verifier.NewAccountVerifier(sc, ledger)
+	ledger.syncer = syncer
 
 	snapshotPool := pool.NewSnapshotPool("snapshotPool")
 	snapshotPool.Init(sc.insertChain,
 		sc.removeChain,
-		snapshotVerifier,
-		syncer,
+		ledger.snapshotVerifier,
+		ledger.syncer,
 		sc,
-		rwMutex,
+		ledger.rwMutex,
 		ledger)
 
 	acPools := make(map[string]*pool.AccountPool)
 	acs := make(map[string]*AccountChain)
 	accounts := Accounts()
 	for _, account := range accounts {
-		ac := &AccountChain{}
-		ac.head = GenAccountBlock(account)
-		accountPool := pool.NewAccountPool(account)
-		accountPool.Init(ac.insertChain, ac.removeChain, accountVerifier, syncer, ac, rwMutex.RLocker(), ac)
+		ac := NewAccountChain(account, sc.head.Height(), sc.head.Hash())
+		accountPool := pool.NewAccountPool("accountChainPool-" + account)
+		accountPool.Init(ac.insertChain, ac.removeChain, ledger.accountVerifier, ledger.syncer, ac, ledger.rwMutex.RLocker(), ac)
 		acs[account] = ac
 		acPools[account] = accountPool
 	}
+
 	ledger.ac = acs
 	ledger.sc = sc
 	ledger.pendingAc = acPools
@@ -117,6 +137,12 @@ func (self *ledger) GetByHFromChain(account string, height int) *common.AccountS
 func (self *ledger) GetReferred(account string, sourceHash string) *common.AccountStateBlock {
 	self.selfAc(account).GetBySourceBlock(sourceHash)
 	return nil
+}
+func (self *ledger) Start() {
+	self.pendingSc.Start()
+	for _, pending := range self.pendingAc {
+		pending.Start()
+	}
 }
 
 func Accounts() []string {
@@ -145,4 +171,3 @@ func GenAccountBlock(address string) *common.AccountStateBlock {
 }
 
 //1533550878
-var genesisSnapshot = common.NewSnapshotBlock(0, "460780b73084275422b520a42ebb9d4f8a8326e1522c79817a19b41ba69dca5b", "", "viteshan", time.Unix(1533550878, 0), nil)

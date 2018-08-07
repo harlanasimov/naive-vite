@@ -110,7 +110,7 @@ func (self *SnapshotBlockVerifyStat) Reset() {
 }
 
 func (self *SnapshotVerifier) NewVerifyStat(t VerifyType, b common.Block) BlockVerifyStat {
-	var block *common.SnapshotBlock
+	block := b.(*common.SnapshotBlock)
 	return &SnapshotBlockVerifyStat{result: NONE, accounts: block.Accounts}
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
+	"time"
 )
 
 // snapshot block chain
@@ -14,10 +15,13 @@ type Snapshotchain struct {
 	pending          *pool.SnapshotPool
 }
 
-func newSnapshotChain() *Snapshotchain {
+var genesisSnapshot = common.NewSnapshotBlock(0, "460780b73084275422b520a42ebb9d4f8a8326e1522c79817a19b41ba69dca5b", "", "viteshan", time.Unix(1533550878, 0), nil)
+
+func NewSnapshotChain() *Snapshotchain {
 	chain := &Snapshotchain{}
 	chain.snapshotDB = make(map[string]*common.SnapshotBlock)
 	chain.snapshotHeightDB = make(map[int]*common.SnapshotBlock)
+	chain.head = genesisSnapshot
 	return chain
 }
 
