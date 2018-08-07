@@ -176,5 +176,6 @@ func (self *ledger) Start() {
 }
 
 func Accounts() []string {
-	return []string{"viteshan1", "viteshan2", "viteshan3"}
+	//return []string{"viteshan1", "viteshan2", "viteshan3"}
+	return []string{}
 }

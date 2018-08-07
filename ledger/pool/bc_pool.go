@@ -276,6 +276,7 @@ func (self *chainPool) currentModifyToChain(chain *forkedChain) error {
 		fromChain := chain.referChain.(*forkedChain)
 		self.modifyRefer(fromChain, chain)
 	}
+	self.current = chain
 	return nil
 }
 
@@ -334,7 +335,7 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 		if tailHeight > c.headHeight {
 			continue
 		}
-		point := findForkPoint(snippet, c)
+		point := findForkPoint(snippet, c, false)
 		if point != nil {
 			return true, false, c
 		}
@@ -343,9 +344,11 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 			return false, false, nil
 		}
 	}
-	point := findForkPoint(snippet, self.diskChain)
-	if point != nil {
-		return true, false, self.current
+	if snippet.tailHeight <= self.diskChain.Head().Height() {
+		point := findForkPoint(snippet, self.current, true)
+		if point != nil {
+			return true, false, self.current
+		}
 	}
 	if snippet.headHeight == snippet.tailHeight {
 		delete(self.snippetChains, snippet.id())
@@ -353,11 +356,13 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 	}
 	return false, false, nil
 }
-func findForkPoint(snippet *snippetChain, chain heightChainReader) *BlockForPool {
+
+// snippet.tailHeight <= chain.headHeight
+func findForkPoint(snippet *snippetChain, chain heightChainReader, refer bool) *BlockForPool {
 	tailHeight := snippet.tailHeight
 	headHeight := snippet.headHeight
 
-	forkpoint := chain.getBlock(tailHeight, false)
+	forkpoint := chain.getBlock(tailHeight, refer)
 	if forkpoint == nil {
 		return nil
 	}
@@ -366,7 +371,7 @@ func findForkPoint(snippet *snippetChain, chain heightChainReader) *BlockForPool
 	}
 
 	for i := tailHeight + 1; i <= headHeight; i++ {
-		uncle := chain.getBlock(i, false)
+		uncle := chain.getBlock(i, refer)
 		if uncle == nil {
 			log.Error("chain error. chain:%s", chain)
 			return nil
@@ -474,6 +479,7 @@ func (self *chainPool) rollback(newHeight int) error {
 
 	for i := height; i > newHeight; i-- {
 		block := self.diskChain.getBlock(i, true)
+		block.verifyStat = self.verifier.NewVerifyStat(verifier.VerifyReferred, block.block)
 		self.current.addTail(block)
 		self.removeChainFn(block.block)
 	}
@@ -510,11 +516,18 @@ func (self *chainPool) printChains() {
 	result := "\n---------------" + self.poolId + "--start-----------------\n"
 	chains := copyChains(self.chains)
 	for _, c := range chains {
+		hashs := ""
+		for i := c.headHeight; i >= 0; i-- {
+			block := c.getBlock(i, true)
+			hashs = block.block.Hash() + "\n" + hashs
+		}
+		result = result + "hashes:\n" + hashs + "\n"
 		if c.chainId == self.current.chainId {
 			result = result + c.String() + " [current]\n"
 		} else {
 			result = result + c.String() + "\n"
 		}
+		result = result + "++++++++++++++++++++++++++++++++++++++++" + "\n"
 
 	}
 	result = result + "---------------" + self.poolId + "--end-----------------\n"

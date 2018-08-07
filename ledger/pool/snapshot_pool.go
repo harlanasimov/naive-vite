@@ -54,13 +54,17 @@ func (self *SnapshotPool) checkFork() {
 }
 
 func (self *SnapshotPool) snapshotFork(longest Chain, current Chain) {
-	log.Warn("snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
+	log.Warn("[try]snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
+	self.rwMu.Lock()
+	defer self.rwMu.Unlock()
+	log.Warn("[lock]snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
 
 	keyPoint, forkPoint, err := self.getForkPoint(longest, current)
 	if err != nil {
 		return
 	}
 	self.consensus.ForkAccounts(keyPoint, forkPoint)
+	self.Rollback(forkPoint)
 	self.CurrentModifyToChain(longest)
 	version.IncForkVersion()
 }
@@ -100,9 +104,15 @@ func (self *SnapshotPool) loop() {
 		self.LoopGenSnippetChains()
 		self.LoopAppendChains()
 		self.LoopFetchForSnippets()
-		self.CheckCurrentInsert(self.insertSnapshotFailCallback)
+		self.loopCheckCurrentInsert()
 		time.Sleep(time.Second)
 	}
+}
+
+func (self *SnapshotPool) loopCheckCurrentInsert() {
+	self.rwMu.RLock()
+	defer self.rwMu.RUnlock()
+	self.CheckCurrentInsert(self.insertSnapshotFailCallback)
 }
 func (self *SnapshotPool) Start() {
 	go self.loop()

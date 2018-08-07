@@ -75,47 +75,91 @@ func TestLedger(t *testing.T) {
 	snapshotBlock, _ := ledger.HeadSnaphost()
 	headAccount, _ := ledger.HeadAccount(viteshan1)
 
-	block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
-		0, -105, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
-	block.SetHash(tools.CalculateAccountHash(block))
-	var err error
-	err = ledger.MiningAccountBlock(viteshan1, block)
-	if err == nil {
-		t.Error("expected error.")
-	} else {
-		log.Info("error:%v", err)
+	{
+		block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
+			0, -105, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
+		block.SetHash(tools.CalculateAccountHash(block))
+		var err error
+		err = ledger.MiningAccountBlock(viteshan1, block)
+		if err == nil {
+			t.Error("expected error.")
+		} else {
+			log.Info("error:%v", err)
+		}
 	}
+	{
+		block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
+			10, -90, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
+		block.SetHash(tools.CalculateAccountHash(block))
 
-	block = common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
-		10, -90, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
-	block.SetHash(tools.CalculateAccountHash(block))
+		err := ledger.MiningAccountBlock(viteshan1, block)
+		if err != nil {
+			t.Errorf("expected error.%v", err)
 
-	err = ledger.MiningAccountBlock(viteshan1, block)
-	if err != nil {
-		t.Errorf("expected error.%v", err)
-
+		}
 	}
+	{
+		reqs = ledger.reqPool.getReqs(viteshan)
+		if len(reqs) != 1 {
+			t.Errorf("reqs should be empty. reqs:%v", reqs)
+		}
+		req := reqs[0]
 
-	reqs = ledger.reqPool.getReqs(viteshan)
-	if len(reqs) != 1 {
-		t.Errorf("reqs should be empty. reqs:%v", reqs)
-	}
-	req := reqs[0]
+		headAcc, _ := ledger.HeadAccount(viteshan)
 
-	headAcc, _ := ledger.HeadAccount(viteshan)
+		block := common.NewAccountBlock(1, "", headAcc.Hash(), viteshan, time.Unix(1533550878, 0),
+			190, 90, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, viteshan1, viteshan, req.reqHash)
 
-	block = common.NewAccountBlock(1, "", headAcc.Hash(), viteshan, time.Unix(1533550878, 0),
-		190, 90, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, viteshan1, viteshan, req.reqHash)
+		block.SetHash(tools.CalculateAccountHash(block))
 
-	block.SetHash(tools.CalculateAccountHash(block))
-
-	err = ledger.MiningAccountBlock(viteshan, block)
-	if err != nil {
-		t.Errorf("expected error.%v", err)
+		err := ledger.MiningAccountBlock(viteshan, block)
+		if err != nil {
+			t.Errorf("expected error.%v", err)
+		}
 	}
 
 	time.Sleep(10 * time.Second)
 }
+
+func TestSnapshotFork(t *testing.T) {
+	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
+	ledger := NewLedger(testSyncer)
+	ledger.Start()
+	time.Sleep(time.Second)
+
+	//ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
+	//ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
+	block := ledger.sc.head
+	block = genSnapshotBlockBy(block)
+	ledger.AddSnapshotBlock(block)
+	block = genSnapshotBlockBy(block)
+	ledger.AddSnapshotBlock(block)
+
+	block2 := block
+	block = genSnapshotBlockBy(block)
+	ledger.AddSnapshotBlock(block)
+	block = genSnapshotBlockBy(block)
+	ledger.AddSnapshotBlock(block)
+	time.Sleep(2 * time.Second)
+	by := genSnapshotBlockBy(block2)
+	ledger.AddSnapshotBlock(by)
+	by = genSnapshotBlockBy(by)
+	ledger.AddSnapshotBlock(by)
+	time.Sleep(10 * time.Second)
+	by = genSnapshotBlockBy(by)
+	ledger.AddSnapshotBlock(by)
+
+	c :=make(chan int)
+	c <-1
+	//time.Sleep(10 * time.Second)
+}
+
+func genSnapshotBlockBy(block *common.SnapshotBlock) *common.SnapshotBlock {
+	snapshot := common.NewSnapshotBlock(block.Height()+1, "", block.Hash(), "viteshan", time.Now(), nil)
+	snapshot.SetHash(tools.CalculateSnapshotHash(snapshot))
+	return snapshot
+}
+
 func genSnapshotBlock(ledger *ledger) *common.SnapshotBlock {
 	block := ledger.sc.head
 

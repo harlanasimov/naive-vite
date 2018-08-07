@@ -76,9 +76,15 @@ func (self *AccountPool) loop() {
 		self.LoopGenSnippetChains()
 		self.LoopAppendChains()
 		self.LoopFetchForSnippets()
-		self.CheckCurrentInsert(self.insertAccountFailCallback)
+		self.loopCheckCurrentInsert()
 		time.Sleep(time.Second)
 	}
+}
+
+func (self *AccountPool) loopCheckCurrentInsert() {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	self.CheckCurrentInsert(self.insertAccountFailCallback)
 }
 func (self *AccountPool) Start() {
 	go self.loop()
