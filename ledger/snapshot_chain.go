@@ -45,6 +45,10 @@ func (self *Snapshotchain) Head() common.Block {
 }
 
 func (self *Snapshotchain) GetBlock(height int) common.Block {
+	if height < 0 {
+		log.Error("can't request height 0 block.[snapshotChain]",)
+		return nil
+	}
 	return self.snapshotHeightDB[height]
 }
 

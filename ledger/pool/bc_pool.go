@@ -80,7 +80,8 @@ func (self *chainPool) forkChain(forked *forkedChain, snippet *snippetChain) (*f
 }
 
 type diskChain struct {
-	reader ChainReader
+	reader  ChainReader
+	chainId string
 }
 
 func (self *diskChain) getBlock(height int, refer bool) *BlockForPool {
@@ -97,7 +98,7 @@ func (self *diskChain) contains(height int) bool {
 }
 
 func (self *diskChain) id() string {
-	return "diskChain"
+	return self.chainId
 }
 
 type BlockVerifySuccessStat struct {
@@ -209,7 +210,7 @@ func (self *BCPool) init(insertChainFn insertChainForkCheck,
 	syncer syncer.Syncer,
 	reader ChainReader) {
 
-	diskChain := &diskChain{reader: reader}
+	diskChain := &diskChain{chainId: self.Id + "-diskchain", reader: reader}
 	chainpool := &chainPool{
 		poolId:        self.Id,
 		insertChainFn: insertChainFn,
@@ -459,7 +460,7 @@ func (self *BCPool) Rollback(new common.Block) error {
 	return self.chainpool.rollback(new.Height())
 }
 func (self *BCPool) RollbackAll() error {
-	return self.chainpool.rollback(0)
+	return self.chainpool.rollback(-1)
 }
 
 func (self *chainPool) rollback(newHeight int) error {
@@ -542,23 +543,6 @@ func (self *forkedChain) init(initBlock common.Block) {
 	self.headHash = initBlock.Hash()
 }
 
-//func (self *forkedChain) copy(maxHeight int, maxHash string) *forkedChain {
-//	copyHeightBlocks := make(map[int]*BlockForPool)
-//
-//	tail := self.tailHeight
-//	for i := tail + 1; i <= maxHeight; i++ {
-//		tmp := self.getBlock(i)
-//		copyHeightBlocks[i] = tmp
-//	}
-//	chain := &forkedChain{}
-//	chain.heightBlocks = copyHeightBlocks
-//	chain.tailHeight = tail
-//	chain.headHeight = maxHeight
-//	chain.headHash = maxHash
-//	chain.referChain = self
-//	return chain
-//
-//}
 func (self *forkedChain) addHead(w *BlockForPool) {
 	self.headHash = w.block.Hash()
 	self.headHeight = w.block.Height()
@@ -583,23 +567,6 @@ func (self *forkedChain) String() string {
 		"headHash:\t" + "[" + self.headHash + "]\t" + "\n" +
 		"tailHeight:\t" + strconv.Itoa(self.tailHeight)
 }
-
-//
-//type bcWaitting struct {
-//	Id string
-//	// key:hash
-//	waitingByHash map[string]*BlockForPool
-//	// key:height
-//	waitingByHeight map[int]*BlockForPool
-//	headH           int
-//	headHash        string
-//	head            common.Block
-//
-//	chainHeadH    int
-//	verifier      verifier.Verifier
-//	insertChainFn insertChainForkCheck
-//	reader        Chain
-//}
 
 type insertChainForkCheck func(block common.Block, forkVersion int) (bool, error)
 type removeChainForkCheck func(block common.Block) (bool, error)
