@@ -63,40 +63,10 @@ func (self *SnapshotPool) snapshotFork(longest Chain, current Chain) {
 	if err != nil {
 		return
 	}
-	self.consensus.ForkAccounts(keyPoint, forkPoint)
-	self.Rollback(forkPoint)
+	self.consensus.ForkAccounts(keyPoint.(*common.SnapshotBlock), forkPoint.(*common.SnapshotBlock))
+	self.Rollback(forkPoint.Height(), forkPoint.Hash())
 	self.CurrentModifyToChain(longest)
 	version.IncForkVersion()
-}
-func (self *SnapshotPool) getForkPoint(longest Chain, current Chain) (*common.SnapshotBlock, *common.SnapshotBlock, error) {
-	curHeadHeight := current.HeadHeight()
-
-	i := curHeadHeight
-	var forkedBlock common.Block
-
-	for {
-		block := longest.GetBlock(i)
-		curBlock := current.GetBlock(i)
-		if block == nil {
-			log.Error("longest chain is not longest. chainId:%s. height:%d", longest.ChainId(), i)
-			return nil, nil, common.StrError{"longest chain error."}
-		}
-
-		if curBlock == nil {
-			log.Error("current chain is wrong. chainId:%s. height:%d", current.ChainId(), i)
-			return nil, nil, common.StrError{"current chain error."}
-		}
-
-		if block.Hash() == curBlock.Hash() {
-			forkedBlock = block
-			keyPoint := longest.GetBlock(i + 1)
-			key := keyPoint.(*common.SnapshotBlock)
-			forked := forkedBlock.(*common.SnapshotBlock)
-			return key, forked, nil
-		}
-		i = i - 1
-	}
-	return nil, nil, common.StrError{"can't find fork point"}
 }
 
 func (self *SnapshotPool) loop() {

@@ -93,7 +93,7 @@ func (self *AccountChain) GetBySourceBlock(sourceHash string) *common.AccountSta
 	for i := height; i > 0; i-- {
 		// first block(i==0) is create block
 		v := self.accountHeightDB[i]
-		if v.SourceHash == sourceHash {
+		if v.BlockType == common.SEND && v.Hash() == sourceHash {
 			return v
 		}
 	}

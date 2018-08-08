@@ -149,8 +149,42 @@ func TestSnapshotFork(t *testing.T) {
 	by = genSnapshotBlockBy(by)
 	ledger.AddSnapshotBlock(by)
 
-	c :=make(chan int)
-	c <-1
+	c := make(chan int)
+	c <- 1
+	//time.Sleep(10 * time.Second)
+}
+
+func TestAccountFork(t *testing.T) {
+	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
+	ledger := NewLedger(testSyncer)
+	ledger.Start()
+	time.Sleep(time.Second)
+
+	//ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
+	//ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
+	block := ledger.sc.head
+	block = genSnapshotBlockBy(block)
+	ledger.AddSnapshotBlock(block)
+
+	viteshan := "viteshan1"
+	ledger.CreateAccount(viteshan)
+	accountH0, _ := ledger.HeadAccount(viteshan)
+	accountH1 := genAccountBlockBy(viteshan, block, accountH0, 0)
+	accountH20 := genAccountBlockBy(viteshan, block, accountH1, 0)
+	ledger.AddAccountBlock(viteshan, accountH1)
+	ledger.AddAccountBlock(viteshan, accountH20)
+	time.Sleep(2 * time.Second)
+	accountH21 := genAccountBlockBy(viteshan, block, accountH1, 1)
+	ledger.AddAccountBlock(viteshan, accountH21)
+
+	block = genSnapAccounts(block, accountH1)
+	ledger.AddSnapshotBlock(block)
+	time.Sleep(2 * time.Second)
+	block = genSnapAccounts(block, accountH21)
+	ledger.AddSnapshotBlock(block)
+
+	c := make(chan int)
+	c <- 1
 	//time.Sleep(10 * time.Second)
 }
 
@@ -160,10 +194,38 @@ func genSnapshotBlockBy(block *common.SnapshotBlock) *common.SnapshotBlock {
 	return snapshot
 }
 
+func genSnapAccounts(block *common.SnapshotBlock, stateBlocks ...*common.AccountStateBlock) *common.SnapshotBlock {
+	var accounts []*common.AccountHashH
+	for _, v := range stateBlocks {
+		accounts = append(accounts, &common.AccountHashH{v.Signer(), v.Hash(), v.Height()})
+	}
+	snapshot := common.NewSnapshotBlock(block.Height()+1, "", block.Hash(), "viteshan", time.Now(), accounts)
+	snapshot.SetHash(tools.CalculateSnapshotHash(snapshot))
+	return snapshot
+}
+
+func genAccountBlockBy(address string, snapshotBlock *common.SnapshotBlock, prev *common.AccountStateBlock, modifiedAmount int) *common.AccountStateBlock {
+	to := "viteshan"
+	block := common.NewAccountBlock(prev.Height()+1, "", prev.Hash(), address, time.Now(),
+		prev.Amount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, address, to, "")
+	block.SetHash(tools.CalculateAccountHash(block))
+	return block
+}
+
 func genSnapshotBlock(ledger *ledger) *common.SnapshotBlock {
 	block := ledger.sc.head
 
 	snapshot := common.NewSnapshotBlock(block.Height()+1, "", block.Hash(), "viteshan", time.Now(), nil)
 	snapshot.SetHash(tools.CalculateSnapshotHash(snapshot))
 	return snapshot
+}
+
+func TestMap(t *testing.T) {
+	stMap := make(map[int]string)
+	stMap[12] = "23"
+	stMap[13] = "23"
+	for k, _ := range stMap {
+		delete(stMap, k)
+	}
+	println(stMap[13])
 }
