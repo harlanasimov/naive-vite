@@ -54,45 +54,19 @@ func (self *SnapshotPool) checkFork() {
 }
 
 func (self *SnapshotPool) snapshotFork(longest Chain, current Chain) {
-	log.Warn("snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
+	log.Warn("[try]snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
+	self.rwMu.Lock()
+	defer self.rwMu.Unlock()
+	log.Warn("[lock]snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
 
 	keyPoint, forkPoint, err := self.getForkPoint(longest, current)
 	if err != nil {
 		return
 	}
-	self.consensus.ForkAccounts(keyPoint, forkPoint)
+	self.consensus.ForkAccounts(keyPoint.(*common.SnapshotBlock), forkPoint.(*common.SnapshotBlock))
+	self.Rollback(forkPoint.Height(), forkPoint.Hash())
 	self.CurrentModifyToChain(longest)
 	version.IncForkVersion()
-}
-func (self *SnapshotPool) getForkPoint(longest Chain, current Chain) (*common.SnapshotBlock, *common.SnapshotBlock, error) {
-	curHeadHeight := current.HeadHeight()
-
-	i := curHeadHeight
-	var forkedBlock common.Block
-
-	for {
-		block := longest.GetBlock(i)
-		curBlock := current.GetBlock(i)
-		if block == nil {
-			log.Error("longest chain is not longest. chainId:%s. height:%d", longest.ChainId(), i)
-			return nil, nil, common.StrError{"longest chain error."}
-		}
-
-		if curBlock == nil {
-			log.Error("current chain is wrong. chainId:%s. height:%d", current.ChainId(), i)
-			return nil, nil, common.StrError{"current chain error."}
-		}
-
-		if block.Hash() == curBlock.Hash() {
-			forkedBlock = block
-			keyPoint := longest.GetBlock(i + 1)
-			key := keyPoint.(*common.SnapshotBlock)
-			forked := forkedBlock.(*common.SnapshotBlock)
-			return key, forked, nil
-		}
-		i = i - 1
-	}
-	return nil, nil, common.StrError{"can't find fork point"}
 }
 
 func (self *SnapshotPool) loop() {
@@ -100,9 +74,15 @@ func (self *SnapshotPool) loop() {
 		self.LoopGenSnippetChains()
 		self.LoopAppendChains()
 		self.LoopFetchForSnippets()
-		self.CheckCurrentInsert(self.insertSnapshotFailCallback)
+		self.loopCheckCurrentInsert()
 		time.Sleep(time.Second)
 	}
+}
+
+func (self *SnapshotPool) loopCheckCurrentInsert() {
+	self.rwMu.RLock()
+	defer self.rwMu.RUnlock()
+	self.CheckCurrentInsert(self.insertSnapshotFailCallback)
 }
 func (self *SnapshotPool) Start() {
 	go self.loop()

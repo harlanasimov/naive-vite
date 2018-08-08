@@ -58,6 +58,8 @@ func (self *SnapshotVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) 
 	accounts := block.Accounts
 	if stat.result.Done() {
 		return
+	} else {
+		stat.result = PENDING
 	}
 	i := 0
 	for _, v := range accounts {
@@ -111,7 +113,10 @@ func (self *SnapshotBlockVerifyStat) Reset() {
 
 func (self *SnapshotVerifier) NewVerifyStat(t VerifyType, b common.Block) BlockVerifyStat {
 	block := b.(*common.SnapshotBlock)
-	return &SnapshotBlockVerifyStat{result: NONE, accounts: block.Accounts}
+
+	stat := &SnapshotBlockVerifyStat{result: NONE, accounts: block.Accounts}
+	stat.results = make(map[string]VerifyResult)
+	return stat
 }
 
 type AccountVerifier struct {

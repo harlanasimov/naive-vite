@@ -6,6 +6,9 @@ import "github.com/viteshan/naive-vite/common"
 
 type Req struct {
 	reqHash string
+	acc     *common.AccountHashH
+	state   int // 0:dirty  1:confirmed  2:unconfirmed
+
 }
 
 type reqPool struct {
@@ -24,19 +27,24 @@ func newReqPool() *reqPool {
 
 func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
 	if block.BlockType == common.SEND {
-		req := &Req{reqHash: block.Hash()}
+		req := &Req{reqHash: block.Hash(), state: 2}
 		self.account(block.To).reqs[req.reqHash] = req
 	} else if block.BlockType == common.RECEIVED {
-		delete(self.account(block.To).reqs, block.SourceHash)
+		//delete(self.account(block.To).reqs, block.SourceHash)
+		req := self.getReq(block.To, block.SourceHash)
+		req.state = 1
+		req.acc = &common.AccountHashH{Addr: block.To, Hash: block.Hash(), Height: block.Height()}
 	}
 }
 
 func (self *reqPool) blockRollback(block *common.AccountStateBlock) {
 	if block.BlockType == common.SEND {
-		delete(self.account(block.To).reqs, block.Hash())
+		//delete(self.account(block.To).reqs, block.Hash())
+		self.getReq(block.To, block.Hash()).state = 0
 	} else if block.BlockType == common.RECEIVED {
-		req := &Req{reqHash: block.SourceHash}
-		self.account(block.To).reqs[req.reqHash] = req
+		//req := &Req{reqHash: block.SourceHash}
+		//self.account(block.To).reqs[req.reqHash] = req
+		self.getReq(block.To, block.SourceHash).state = 2
 	}
 }
 
@@ -58,4 +66,21 @@ func (self *reqPool) getReqs(address string) []*Req {
 		i++
 	}
 	return result
+}
+func (self *reqPool) getReq(address string, sourceHash string) *Req {
+	account := self.account(address)
+	return account.reqs[sourceHash]
+}
+
+func (self *reqPool) confirmed(address string, sourceHash string) *common.AccountHashH {
+	account := self.account(address)
+	if account == nil {
+		return nil
+	}
+	req := account.reqs[sourceHash]
+
+	if req != nil && req.state == 1 {
+		return req.acc
+	}
+	return nil
 }

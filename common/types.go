@@ -18,6 +18,11 @@ type AccountHashH struct {
 	Height int
 }
 
+type HashHeight struct {
+	Hash string
+	Height int
+}
+
 //BlockType is the type of Tx described by int.
 type BlockType int
 

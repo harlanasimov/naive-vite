@@ -70,6 +70,7 @@ func (self *ledger) CreateAccount(address string) error {
 	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, self.syncer, accountChain, self.rwMutex.RLocker(), accountChain)
 	self.ac[address] = accountChain
 	self.pendingAc[address] = accountPool
+	accountPool.Start()
 	return nil
 }
 
@@ -99,17 +100,114 @@ func (self *ledger) selfPendingAc(addr string) *pool.AccountPool {
 }
 
 func (self *ledger) ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *common.SnapshotBlock) error {
-	for _, v := range self.pendingAc {
-		err := v.RollbackAndForkAccount(nil, forkPoint)
+	tasks := make(map[string]*common.AccountHashH)
+
+	for k, v := range self.pendingAc {
+		ok, block, err := v.FindRollbackPointByReferSnapshot(forkPoint.Height(), forkPoint.Hash())
 		if err != nil {
-			return nil
+			log.Error("%v", err)
+			continue
 		}
+		if !ok {
+			continue
+		} else {
+			h := &common.AccountHashH{k, block.Hash(), block.Height()}
+			tasks[h.Addr] = h
+		}
+	}
+	waitRollbackAccounts := self.getWaitRollbackAccounts(tasks)
+
+	for _, v := range waitRollbackAccounts {
+		self.selfPendingAc(v.Addr).Rollback(v.Height, v.Hash)
+	}
+	for _, v := range keyPoint.Accounts {
+		self.ForkAccountTo(v)
 	}
 	return nil
 }
+func (self *ledger) getWaitRollbackAccounts(tasks map[string]*common.AccountHashH) map[string]*common.AccountHashH {
+	waitRollback := make(map[string]*common.AccountHashH)
+	for {
+		var sendBlocks []*common.AccountStateBlock
+		for k, v := range tasks {
+			delete(tasks, k)
+			if canAdd(waitRollback, v) {
+				waitRollback[v.Addr] = v
+			}
+			addWaitRollback(waitRollback, v)
+			tmpBlocks, err := self.selfPendingAc(v.Addr).TryRollback(v.Height, v.Hash)
+			if err == nil {
+				for _, v := range tmpBlocks {
+					sendBlocks = append(sendBlocks, v)
+				}
+			} else {
+				log.Error("%v", err)
+			}
+		}
+		for _, v := range sendBlocks {
+			sourceHash := v.SourceHash
+			signer := v.Signer()
+			req := self.reqPool.confirmed(signer, sourceHash)
+			if req != nil {
+				if canAdd(tasks, req) {
+					tasks[req.Addr] = req
+				}
+			}
+		}
+		if len(tasks) == 0 {
+			break
+		}
+	}
+
+	return waitRollback
+}
+
+// h is closer to genesis
+func canAdd(hs map[string]*common.AccountHashH, h *common.AccountHashH) bool {
+	hashH := hs[h.Addr]
+	if hashH == nil {
+		return true
+	}
+
+	if h.Height < hashH.Height {
+		return true
+	}
+	return false
+}
+func addWaitRollback(hs map[string]*common.AccountHashH, h *common.AccountHashH) {
+	hashH := hs[h.Addr]
+	if hashH == nil {
+		hs[h.Addr] = h
+		return
+	}
+
+	if hashH.Height < h.Height {
+		hs[h.Addr] = h
+		return
+	}
+}
 
 func (self *ledger) ForkAccountTo(h *common.AccountHashH) error {
-	return self.selfPendingAc(h.Addr).ForkAccount(h)
+	this := self.selfPendingAc(h.Addr)
+	ok, block, chain, err := this.FindRollbackPointForAccountHashH(h.Height, h.Hash)
+	if err != nil {
+		log.Error("%v", err)
+	}
+	if !ok {
+		return nil
+	}
+
+	tasks := make(map[string]*common.AccountHashH)
+	tasks[h.Addr] = &common.AccountHashH{h.Addr, block.Hash(), block.Height()}
+	waitRollback := self.getWaitRollbackAccounts(tasks)
+	for _, v := range waitRollback {
+		self.selfPendingAc(v.Addr).Rollback(v.Height, v.Hash)
+	}
+	err = this.CurrentModifyToChain(chain)
+	if err != nil {
+		log.Error("%v", err)
+	}
+	return this.ForkAccount(h)
 }
 
 func NewLedger(syncer syncer.Syncer) *ledger {
@@ -176,5 +274,6 @@ func (self *ledger) Start() {
 }
 
 func Accounts() []string {
-	return []string{"viteshan1", "viteshan2", "viteshan3"}
+	//return []string{"viteshan1", "viteshan2", "viteshan3"}
+	return []string{}
 }
