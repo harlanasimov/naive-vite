@@ -1,6 +1,7 @@
 package common
 
 import (
+	"strconv"
 	"time"
 )
 
@@ -18,8 +19,32 @@ type AccountHashH struct {
 	Height int
 }
 
+type SnapshotPoint struct {
+	SnapshotHeight int
+	SnapshotHash   string
+	AccountHeight  int
+	AccountHash    string
+}
+
+func (self *SnapshotPoint) Equals(peer *SnapshotPoint) bool {
+	if peer == nil {
+		return false
+	}
+	if self.SnapshotHash == peer.SnapshotHash &&
+		self.SnapshotHeight == peer.SnapshotHeight &&
+		self.AccountHeight == peer.AccountHeight &&
+		self.AccountHash == peer.AccountHash {
+		return true
+	}
+	return false
+}
+
+func (self *SnapshotPoint) String() string {
+	return "[" + strconv.Itoa(self.SnapshotHeight) + "][" + self.SnapshotHash + "][" + strconv.Itoa(self.AccountHeight) + "][" + self.AccountHash + "]"
+}
+
 type HashHeight struct {
-	Hash string
+	Hash   string
 	Height int
 }
 

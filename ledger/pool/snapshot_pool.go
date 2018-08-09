@@ -59,13 +59,36 @@ func (self *SnapshotPool) snapshotFork(longest Chain, current Chain) {
 	defer self.rwMu.Unlock()
 	log.Warn("[lock]snapshot chain start fork.longest chain:%s, currentchain:%s", longest.ChainId(), current.ChainId())
 
-	keyPoint, forkPoint, err := self.getForkPoint(longest, current)
+	k, f, err := self.getForkPoint(longest, current)
 	if err != nil {
+		log.Error("get snapshot forkPoint err. err:%v", err)
 		return
 	}
-	self.consensus.ForkAccounts(keyPoint.(*common.SnapshotBlock), forkPoint.(*common.SnapshotBlock))
-	self.Rollback(forkPoint.Height(), forkPoint.Hash())
-	self.CurrentModifyToChain(longest)
+	forkPoint := f.(*common.SnapshotBlock)
+	keyPoint := k.(*common.SnapshotBlock)
+
+	startAcs, endAcs := self.getUnlockAccountSnapshot(forkPoint)
+
+	err = self.consensus.UnLockAccounts(startAcs, endAcs)
+	if err != nil {
+		log.Error("unlock accounts fail. err:%v", err)
+		return
+	}
+	err = self.consensus.ForkAccounts(keyPoint, forkPoint)
+	if err != nil {
+		log.Error("rollback accounts fail. err:%v", err)
+		return
+	}
+	err = self.Rollback(forkPoint.Height(), forkPoint.Hash())
+	if err != nil {
+		log.Error("rollback snapshot fail. err:%v", err)
+		return
+	}
+	err = self.CurrentModifyToChain(longest)
+	if err != nil {
+		log.Error("snapshot modify current fail. err:%v", err)
+		return
+	}
 	version.IncForkVersion()
 }
 
@@ -82,7 +105,7 @@ func (self *SnapshotPool) loop() {
 func (self *SnapshotPool) loopCheckCurrentInsert() {
 	self.rwMu.RLock()
 	defer self.rwMu.RUnlock()
-	self.CheckCurrentInsert(self.insertSnapshotFailCallback)
+	self.CheckCurrentInsert(self.insertSnapshotFailCallback, self.insertSnapshotSuccessCallback)
 }
 func (self *SnapshotPool) Start() {
 	go self.loop()
@@ -99,5 +122,41 @@ func (self *SnapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.
 		if result == verifier.FAIL {
 			self.consensus.ForkAccountTo(account)
 		}
+	}
+}
+
+func (self *SnapshotPool) insertSnapshotSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
+	block := b.(*common.SnapshotBlock)
+
+	for _, account := range block.Accounts {
+		self.consensus.SnapshotAccount(block, account)
+	}
+}
+func (self *SnapshotPool) getUnlockAccountSnapshot(block *common.SnapshotBlock) (map[string]*common.SnapshotPoint, map[string]*common.SnapshotPoint) {
+	h := self.chainpool.diskChain.Head()
+	head := h.(*common.SnapshotBlock)
+	startAcs := make(map[string]*common.SnapshotPoint)
+	endAcs := make(map[string]*common.SnapshotPoint)
+
+	self.accounts(startAcs, endAcs, head)
+	for i := head.Height() - 1; i > block.Height(); i-- {
+		b := self.chainpool.diskChain.getBlock(i, false)
+		if b != nil {
+			block := b.block.(*common.SnapshotBlock)
+			self.accounts(startAcs, endAcs, block)
+		}
+	}
+	return startAcs, endAcs
+}
+
+func (self *SnapshotPool) accounts(start map[string]*common.SnapshotPoint, end map[string]*common.SnapshotPoint, block *common.SnapshotBlock) {
+	hs := block.Accounts
+	for _, v := range hs {
+		point := &common.SnapshotPoint{SnapshotHeight: block.Height(), SnapshotHash: block.Hash(), AccountHeight: v.Height, AccountHash: v.Hash}
+		s := start[v.Addr]
+		if s == nil {
+			start[v.Addr] = point
+		}
+		end[v.Addr] = point
 	}
 }

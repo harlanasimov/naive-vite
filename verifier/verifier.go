@@ -27,7 +27,7 @@ const (
 	VerifyReferred VerifyType = iota
 )
 
-type VerifierFailCallback func(block common.Block, stat BlockVerifyStat)
+type Callback func(block common.Block, stat BlockVerifyStat)
 type Verifier interface {
 	VerifyReferred(block common.Block, stat BlockVerifyStat)
 	NewVerifyStat(t VerifyType, block common.Block) BlockVerifyStat

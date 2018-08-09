@@ -143,12 +143,16 @@ func (self *AccountPool) loop() {
 func (self *AccountPool) loopCheckCurrentInsert() {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	self.CheckCurrentInsert(self.insertAccountFailCallback)
+	self.CheckCurrentInsert(self.insertAccountFailCallback, self.insertAccountSuccessCallback)
 }
 func (self *AccountPool) Start() {
 	go self.loop()
 }
 
 func (self *AccountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {
+	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
+}
+
+func (self *AccountPool) insertAccountSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
 	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
 }

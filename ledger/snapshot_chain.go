@@ -58,15 +58,15 @@ func (self *Snapshotchain) GetBlock(height int) common.Block {
 	return block
 }
 
-func (self *Snapshotchain) insertChain(b common.Block, forkVersion int) (bool, error) {
+func (self *Snapshotchain) insertChain(b common.Block, forkVersion int) error {
 	log.Info("insert to snapshot Chain: %v", b)
 	block := b.(*common.SnapshotBlock)
 	self.snapshotDB[block.Hash()] = block
 	self.snapshotHeightDB[block.Height()] = block
 	self.head = block
-	return true, nil
+	return nil
 }
-func (self *Snapshotchain) removeChain(b common.Block) (bool, error) {
+func (self *Snapshotchain) removeChain(b common.Block) error {
 	log.Info("remove from snapshot Chain: %s", b)
 	block := b.(*common.SnapshotBlock)
 
@@ -74,5 +74,5 @@ func (self *Snapshotchain) removeChain(b common.Block) (bool, error) {
 	delete(self.snapshotDB, block.Hash())
 	delete(self.snapshotHeightDB, block.Height())
 	self.head = head
-	return true, nil
+	return nil
 }
