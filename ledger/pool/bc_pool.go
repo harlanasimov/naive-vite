@@ -521,6 +521,15 @@ func (self *chainPool) rollback(newHeight int) error {
 }
 
 func (self *chainPool) insertNotify(head common.Block) {
+	if self.current.headHeight == self.current.tailHeight {
+		if self.current.tailHash == head.PreHash() && self.current.headHash == head.PreHash() {
+			self.current.headHash = head.Hash()
+			self.current.tailHash = head.Hash()
+			self.current.tailHeight = head.Height()
+			self.current.headHeight = head.Height()
+			return
+		}
+	}
 	self.currentModify(head)
 }
 

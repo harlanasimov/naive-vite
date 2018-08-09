@@ -2,8 +2,11 @@ package ledger
 
 import (
 	"fmt"
+	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/consensus"
+	"github.com/viteshan/naive-vite/miner"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/tools"
 	"strconv"
@@ -237,4 +240,49 @@ func TestMap(t *testing.T) {
 		delete(stMap, k)
 	}
 	println(stMap[13])
+}
+
+func TestLedger_MiningSnapshotBlock(t *testing.T) {
+	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
+	ledger := NewLedger(testSyncer)
+	ledger.Start()
+
+}
+
+func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW) (*miner.Miner, EventBus.Bus) {
+	bus := EventBus.New()
+	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
+	miner := miner.NewMiner(rw, bus, coinbase, committee)
+	return miner, bus
+}
+
+func genCommitee() *consensus.Committee {
+	genesisTime := GetGenesisSnapshot().Timestamp()
+	committee := consensus.NewCommittee(genesisTime, 1, int32(len(consensus.DefaultMembers)))
+	return committee
+}
+
+func TestNewMiner(t *testing.T) {
+	testSyncer := &TestSyncer{blocks: make(map[string]*TestBlock)}
+	ledger := NewLedger(testSyncer)
+	ledger.Start()
+
+	committee := genCommitee()
+	miner, bus := genMiner(committee, ledger)
+
+	committee.Init()
+	miner.Init()
+	committee.Start()
+	miner.Start()
+	var c chan int = make(chan int)
+	select {
+	case c <- 0:
+	case <-time.After(5 * time.Second):
+		println("timeout and downloader finish.")
+		//miner.downloaderRegisterCh <- 0
+		bus.Publish(common.DwlDone)
+		println("-----------timeout")
+	}
+
+	c <- 0
 }
