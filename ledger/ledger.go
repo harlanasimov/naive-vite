@@ -15,7 +15,7 @@ type Ledger interface {
 	// from other peer
 	AddSnapshotBlock(block *common.SnapshotBlock)
 	// from self
-	MiningSnapshotBlock(address string, timestamp uint64) error
+	MiningSnapshotBlock(address string, timestamp int64) error
 	// from other peer
 	AddAccountBlock(account string, block *common.AccountStateBlock)
 	// from self
@@ -80,7 +80,7 @@ func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
 	self.pendingSc.AddBlock(block)
 }
 
-func (self *ledger) MiningSnapshotBlock(address string, timestamp uint64) error {
+func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 	//self.pendingSc.AddDirectBlock(block)
 	self.rwMutex.Lock()
 	defer self.rwMutex.Unlock()
@@ -97,7 +97,7 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp uint64) error 
 	if len(accounts) == 0 {
 		accounts = nil
 	}
-	block := common.NewSnapshotBlock(head.Height()+1, "", head.Hash(), address, time.Unix(int64(timestamp), 0), accounts)
+	block := common.NewSnapshotBlock(head.Height()+1, "", head.Hash(), address, time.Unix(timestamp, 0), accounts)
 	block.SetHash(tools.CalculateSnapshotHash(block))
 	err := self.pendingSc.AddDirectBlock(block)
 	if err != nil {
