@@ -5,8 +5,10 @@ import (
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/syncer"
+	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
 	"sync"
+	"time"
 )
 
 type Ledger interface {
@@ -80,6 +82,27 @@ func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
 
 func (self *ledger) MiningSnapshotBlock(address string, timestamp uint64) error {
 	//self.pendingSc.AddDirectBlock(block)
+	self.rwMutex.Lock()
+	defer self.rwMutex.Unlock()
+	head := self.sc.head
+	//common.SnapshotBlock{}
+	var accounts []*common.AccountHashH
+	for k, v := range self.ac {
+		i, s := v.NextSnapshotPoint()
+		if i < 0 {
+			continue
+		}
+		accounts = append(accounts, &common.AccountHashH{k, s, i})
+	}
+	if len(accounts) == 0 {
+		accounts = nil
+	}
+	block := common.NewSnapshotBlock(head.Height()+1, "", head.Hash(), address, time.Unix(int64(timestamp), 0), accounts)
+	block.SetHash(tools.CalculateSnapshotHash(block))
+	err := self.pendingSc.AddDirectBlock(block)
+	if err != nil {
+log.Error("")
+	}
 	return nil
 }
 
