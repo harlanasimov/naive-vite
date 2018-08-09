@@ -118,7 +118,10 @@ func (self *ledger) ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *comm
 	waitRollbackAccounts := self.getWaitRollbackAccounts(tasks)
 
 	for _, v := range waitRollbackAccounts {
-		self.selfPendingAc(v.Addr).Rollback(v.Height, v.Hash)
+		err := self.selfPendingAc(v.Addr).Rollback(v.Height, v.Hash)
+		if err != nil {
+			return err
+		}
 	}
 	for _, v := range keyPoint.Accounts {
 		self.ForkAccountTo(v)
@@ -207,9 +210,21 @@ func (self *ledger) ForkAccountTo(h *common.AccountHashH) error {
 	if err != nil {
 		log.Error("%v", err)
 	}
-	return this.ForkAccount(h)
+	return err
 }
 
+func (self *ledger) SnapshotAccount(block *common.SnapshotBlock, h *common.AccountHashH) {
+	self.selfAc(h.Addr).SnapshotPoint(block.Height(), block.Hash(), h)
+}
+func (self *ledger) UnLockAccounts(startAcs map[string]*common.SnapshotPoint, endAcs map[string]*common.SnapshotPoint) error {
+	for k, v := range startAcs {
+		err := self.selfAc(k).RollbackSnapshotPoint(v, endAcs[k])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func NewLedger(syncer syncer.Syncer) *ledger {
 	ledger := &ledger{}
 	ledger.rwMutex = new(sync.RWMutex)

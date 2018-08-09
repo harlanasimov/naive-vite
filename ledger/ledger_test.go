@@ -135,10 +135,19 @@ func TestSnapshotFork(t *testing.T) {
 	block = genSnapshotBlockBy(block)
 	ledger.AddSnapshotBlock(block)
 
+	viteshan := "viteshan1"
+	ledger.CreateAccount(viteshan)
+	accountH0, _ := ledger.HeadAccount(viteshan)
+
 	block2 := block
+
 	block = genSnapshotBlockBy(block)
 	ledger.AddSnapshotBlock(block)
-	block = genSnapshotBlockBy(block)
+	//block = genSnapshotBlockBy(block)
+
+	accountH1 := genAccountBlockBy(viteshan, block, accountH0, 0)
+	ledger.AddAccountBlock(viteshan, accountH1)
+	block = genSnapAccounts(block, accountH1)
 	ledger.AddSnapshotBlock(block)
 	time.Sleep(2 * time.Second)
 	by := genSnapshotBlockBy(block2)
