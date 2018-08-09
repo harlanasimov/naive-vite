@@ -101,7 +101,8 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp uint64) error 
 	block.SetHash(tools.CalculateSnapshotHash(block))
 	err := self.pendingSc.AddDirectBlock(block)
 	if err != nil {
-log.Error("")
+		log.Error("add direct block error. ", err)
+		return err
 	}
 	return nil
 }
