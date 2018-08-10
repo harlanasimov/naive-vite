@@ -2,9 +2,9 @@ package consensus
 
 import (
 	"github.com/vitelabs/go-vite/common/types"
-	"github.com/vitelabs/go-vite/log"
 	"github.com/viteshan/naive-vite/common"
 	"time"
+	"github.com/viteshan/naive-vite/common/log"
 )
 
 var DefaultMembers = []string{

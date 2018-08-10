@@ -231,6 +231,12 @@ func (self *AccountVerifier) checkSelfAmount(block *common.AccountStateBlock) Ve
 		return FAIL
 	}
 
+	if block.BlockType == common.SEND && block.ModifiedAmount > 0 {
+		return FAIL
+	}
+	if block.BlockType == common.RECEIVED && block.ModifiedAmount < 0 {
+		return FAIL
+	}
 	if last.Amount+block.ModifiedAmount == block.Amount &&
 		block.Amount > 0 {
 		return SUCCESS

@@ -5,10 +5,11 @@ import "github.com/viteshan/naive-vite/common"
 // just only unreceived transactions
 
 type Req struct {
-	reqHash string
+	ReqHash string
 	acc     *common.AccountHashH
 	state   int // 0:dirty  1:confirmed  2:unconfirmed
-
+	Amount  int
+	From    string
 }
 
 type reqPool struct {
@@ -27,8 +28,8 @@ func newReqPool() *reqPool {
 
 func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
 	if block.BlockType == common.SEND {
-		req := &Req{reqHash: block.Hash(), state: 2}
-		self.account(block.To).reqs[req.reqHash] = req
+		req := &Req{ReqHash: block.Hash(), state: 2, From: block.From, Amount: block.ModifiedAmount}
+		self.account(block.To).reqs[req.ReqHash] = req
 	} else if block.BlockType == common.RECEIVED {
 		//delete(self.account(block.To).reqs, block.SourceHash)
 		req := self.getReq(block.To, block.SourceHash)
@@ -59,11 +60,11 @@ func (self *reqPool) account(address string) *reqAccountPool {
 
 func (self *reqPool) getReqs(address string) []*Req {
 	account := self.account(address)
-	result := make([]*Req, len(account.reqs))
-	i := 0
+	var result []*Req
 	for _, req := range account.reqs {
-		result[i] = req
-		i++
+		if req.state != 1 {
+			result = append(result, req)
+		}
 	}
 	return result
 }

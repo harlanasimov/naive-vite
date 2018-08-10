@@ -17,13 +17,18 @@ type Ledger interface {
 	// from self
 	MiningSnapshotBlock(address string, timestamp int64) error
 	// from other peer
-	AddAccountBlock(account string, block *common.AccountStateBlock)
+	AddAccountBlock(account string, block *common.AccountStateBlock) error
 	// from self
-	MiningAccountBlock(address string, block *common.AccountStateBlock) error
+	RequestAccountBlock(address string, block *common.AccountStateBlock) error
+	ResponseAccountBlock(from string, to string, reqHash string) error
 	// create account genesis block
 	CreateAccount(address string) error
 	HeadAccount(address string) (*common.AccountStateBlock, error)
-	HeadSnaphost() (*common.SnapshotBlock, error)
+	HeadSnapshost() (*common.SnapshotBlock, error)
+	GetAccountBalance(address string) int
+	ExistAccount(address string) bool
+	ListRequest(address string) []*Req
+	Start()
 }
 
 type ledger struct {
@@ -52,7 +57,7 @@ func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, erro
 	return block, nil
 }
 
-func (self *ledger) HeadSnaphost() (*common.SnapshotBlock, error) {
+func (self *ledger) HeadSnapshost() (*common.SnapshotBlock, error) {
 	head := self.sc.Head()
 	if head == nil {
 		return nil, common.StrError{"head not exist."}
@@ -74,6 +79,17 @@ func (self *ledger) CreateAccount(address string) error {
 	self.pendingAc[address] = accountPool
 	accountPool.Start()
 	return nil
+}
+
+func (self *ledger) ExistAccount(address string) bool {
+	return self.selfAc(address) != nil
+}
+func (self *ledger) GetAccountBalance(address string) int {
+	ac := self.selfAc(address)
+	if ac == nil || ac.Head() == nil {
+		return 0
+	}
+	return ac.Head().(*common.AccountStateBlock).Amount
 }
 
 func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
@@ -107,16 +123,45 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 	return nil
 }
 
-func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) {
+func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) error {
 	self.selfPendingAc(account).AddBlock(block)
+	return nil
 }
 
-func (self *ledger) MiningAccountBlock(account string, block *common.AccountStateBlock) error {
+func (self *ledger) RequestAccountBlock(account string, block *common.AccountStateBlock) error {
 	return self.selfPendingAc(account).AddDirectBlock(block)
+}
+func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string) error {
+	fromAc := self.selfAc(from)
+	if fromAc == nil {
+		return common.StrError{"not exist for account[" + from + "]"}
+	}
+	toAc := self.selfAc(to)
+	if toAc == nil {
+		return common.StrError{"not exist for account[" + to + "]"}
+	}
+	b := fromAc.GetBlockByHash(reqHash)
+	if b == nil {
+		return common.StrError{"not exist for account[" + from + "]block[" + reqHash + "]"}
+	}
+
+	reqBlock := b.(*common.AccountStateBlock)
+
+	prev := toAc.Head().(*common.AccountStateBlock)
+	snapshostBlock, _ := self.HeadSnapshost()
+
+	modifiedAmount := -reqBlock.ModifiedAmount
+	block := common.NewAccountBlock(prev.Height()+1, "", prev.Hash(), to, time.Now(), prev.Amount+modifiedAmount, modifiedAmount, snapshostBlock.Height(), snapshostBlock.Hash(), common.RECEIVED, from, to, reqHash)
+	block.SetHash(tools.CalculateAccountHash(block))
+	return self.selfPendingAc(to).AddDirectBlock(block)
 }
 
 func (self *ledger) selfAc(addr string) *AccountChain {
-	return self.ac[addr]
+	chain, ok := self.ac[addr]
+	if !ok {
+		return nil
+	}
+	return chain
 }
 
 func (self *ledger) selfPendingAc(addr string) *pool.AccountPool {
@@ -300,6 +345,10 @@ func (self *ledger) GetByHFromChain(account string, height int) *common.AccountS
 	}
 	block := b.(*common.AccountStateBlock)
 	return block
+}
+func (self *ledger) ListRequest(address string) []*Req {
+	reqs := self.reqPool.getReqs(address)
+	return reqs
 }
 func (self *ledger) GetReferred(account string, sourceHash string) *common.AccountStateBlock {
 	self.selfAc(account).GetBySourceBlock(sourceHash)

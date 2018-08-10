@@ -75,7 +75,7 @@ func TestLedger(t *testing.T) {
 	viteshan1 := "viteshan1"
 	ledger.CreateAccount(viteshan)
 	time.Sleep(2 * time.Second)
-	snapshotBlock, _ := ledger.HeadSnaphost()
+	snapshotBlock, _ := ledger.HeadSnapshost()
 	headAccount, _ := ledger.HeadAccount(viteshan1)
 
 	{
@@ -83,7 +83,7 @@ func TestLedger(t *testing.T) {
 			0, -105, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
 		block.SetHash(tools.CalculateAccountHash(block))
 		var err error
-		err = ledger.MiningAccountBlock(viteshan1, block)
+		err = ledger.RequestAccountBlock(viteshan1, block)
 		if err == nil {
 			t.Error("expected error.")
 		} else {
@@ -95,7 +95,7 @@ func TestLedger(t *testing.T) {
 			10, -90, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
 		block.SetHash(tools.CalculateAccountHash(block))
 
-		err := ledger.MiningAccountBlock(viteshan1, block)
+		err := ledger.RequestAccountBlock(viteshan1, block)
 		if err != nil {
 			t.Errorf("expected error.%v", err)
 
@@ -115,7 +115,7 @@ func TestLedger(t *testing.T) {
 
 		block.SetHash(tools.CalculateAccountHash(block))
 
-		err := ledger.MiningAccountBlock(viteshan, block)
+		err := ledger.RequestAccountBlock(viteshan, block)
 		if err != nil {
 			t.Errorf("expected error.%v", err)
 		}

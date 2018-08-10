@@ -183,3 +183,4 @@ func NewAccountBlock(
 	block.SourceHash = sourceHash
 	return block
 }
+
