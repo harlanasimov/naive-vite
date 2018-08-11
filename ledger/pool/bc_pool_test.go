@@ -3,7 +3,6 @@ package pool
 import (
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/test"
 	"github.com/viteshan/naive-vite/verifier"
 	"strconv"
@@ -80,7 +79,7 @@ func (self *TestChainReader) removeChain(block common.Block) error {
 	delete(self.store, block.Height())
 	return nil
 }
-func (self *TestSyncer) Fetch(hash syncer.BlockHash, prevCnt int) {
+func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
 	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
 	go func() {
 		prev := hash.Hash

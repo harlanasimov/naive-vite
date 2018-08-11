@@ -34,7 +34,7 @@ func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
 		//delete(self.account(block.To).reqs, block.SourceHash)
 		req := self.getReq(block.To, block.SourceHash)
 		req.state = 1
-		req.acc = &common.AccountHashH{Addr: block.To, Hash: block.Hash(), Height: block.Height()}
+		req.acc = common.NewAccountHashH(block.To, block.Hash(), block.Height())
 	}
 }
 

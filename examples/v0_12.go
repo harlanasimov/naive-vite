@@ -27,7 +27,7 @@ type V0_12 struct {
 type TestSyncer struct {
 }
 
-func (self *TestSyncer) Fetch(hash syncer.BlockHash, prevCnt int) {
+func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
 
 }
 func newV0_12() *V0_12 {

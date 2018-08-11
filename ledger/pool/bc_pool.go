@@ -863,7 +863,7 @@ func (self *BCPool) LoopFetchForSnippets() {
 		}
 
 		if diff > 1 {
-			hash := syncer.BlockHash{Hash: w.tailHash, Height: w.tailHeight}
+			hash := common.HashHeight{Hash: w.tailHash, Height: w.tailHeight}
 			self.syncer.Fetch(hash, diff)
 		}
 		prev = w.headHeight
@@ -892,7 +892,7 @@ func (self *BCPool) whichChain(height int, hash string) *forkedChain {
 	if finalChain == nil {
 		// todo fetch data
 		head := self.chainpool.diskChain.Head()
-		self.syncer.Fetch(syncer.BlockHash{Height: height, Hash: hash}, height-head.Height())
+		self.syncer.Fetch(common.HashHeight{Height: height, Hash: hash}, height-head.Height())
 		log.Warn("block chain can't find. poolId:%s, height:%d, hash:%s", self.chainpool.poolId, height, hash)
 		return nil
 	}
@@ -915,7 +915,7 @@ func (self *BCPool) currentModify(forkHeight int, forkHash string) error {
 	if finalChain == nil {
 		// todo fetch data
 		head := self.chainpool.diskChain.Head()
-		self.syncer.Fetch(syncer.BlockHash{Height: forkHeight, Hash: forkHash}, forkHeight-head.Height())
+		self.syncer.Fetch(common.HashHeight{Height: forkHeight, Hash: forkHash}, forkHeight-head.Height())
 		log.Warn("account can't fork. poolId:%s, height:%d, hash:%s", self.chainpool.poolId, forkHeight, forkHash)
 		return nil
 	}

@@ -108,7 +108,7 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 		if i < 0 {
 			continue
 		}
-		accounts = append(accounts, &common.AccountHashH{k, s, i})
+		accounts = append(accounts, common.NewAccountHashH(k, s, i))
 	}
 	if len(accounts) == 0 {
 		accounts = nil
@@ -180,7 +180,7 @@ func (self *ledger) ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *comm
 		if !ok {
 			continue
 		} else {
-			h := &common.AccountHashH{k, block.Hash(), block.Height()}
+			h := common.NewAccountHashH(k, block.Hash(), block.Height())
 			tasks[h.Addr] = h
 		}
 	}
@@ -270,7 +270,7 @@ func (self *ledger) ForkAccountTo(h *common.AccountHashH) error {
 	}
 
 	tasks := make(map[string]*common.AccountHashH)
-	tasks[h.Addr] = &common.AccountHashH{h.Addr, block.Hash(), block.Height()}
+	tasks[h.Addr] = common.NewAccountHashH(h.Addr, block.Hash(), block.Height())
 	waitRollback := self.getWaitRollbackAccounts(tasks)
 	for _, v := range waitRollback {
 		self.selfPendingAc(v.Addr).Rollback(v.Height, v.Hash)

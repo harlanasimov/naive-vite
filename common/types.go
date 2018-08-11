@@ -13,10 +13,22 @@ type Block interface {
 	Timestamp() time.Time
 }
 
-type AccountHashH struct {
-	Addr   string
+type HashHeight struct {
 	Hash   string
 	Height int
+}
+
+type AccountHashH struct {
+	HashHeight
+	Addr string
+}
+
+func NewAccountHashH(address string, hash string, height int) *AccountHashH {
+	self := &AccountHashH{}
+	self.Addr = address
+	self.Hash = hash
+	self.Height = height
+	return self
 }
 
 type SnapshotPoint struct {
@@ -41,11 +53,6 @@ func (self *SnapshotPoint) Equals(peer *SnapshotPoint) bool {
 
 func (self *SnapshotPoint) String() string {
 	return "[" + strconv.Itoa(self.SnapshotHeight) + "][" + self.SnapshotHash + "][" + strconv.Itoa(self.AccountHeight) + "][" + self.AccountHash + "]"
-}
-
-type HashHeight struct {
-	Hash   string
-	Height int
 }
 
 //BlockType is the type of Tx described by int.
@@ -183,4 +190,3 @@ func NewAccountBlock(
 	block.SourceHash = sourceHash
 	return block
 }
-

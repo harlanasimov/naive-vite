@@ -3,6 +3,8 @@ package test
 import (
 	"time"
 	"strconv"
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/log"
 )
 
 type TestBlock struct {
@@ -12,7 +14,6 @@ type TestBlock struct {
 	Tsigner    string
 	Ttimestamp time.Time
 }
-
 
 
 func (self *TestBlock) Height() int {
@@ -35,4 +36,15 @@ func (self *TestBlock) Timestamp() time.Time {
 }
 func (self *TestBlock) String() string {
 	return "Theight:[" + strconv.Itoa(self.Theight) + "]\tThash:[" + self.Thash + "]\tTpreHash:[" + self.TpreHash + "]\tTsigner:[" + self.Tsigner + "]"
+}
+
+
+
+type TestSyncer struct {
+	Blocks map[string]*TestBlock
+}
+
+
+func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
+	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
 }
