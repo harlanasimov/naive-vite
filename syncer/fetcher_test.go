@@ -2,6 +2,8 @@ package syncer
 
 import (
 	"fmt"
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/test"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -10,18 +12,18 @@ import (
 
 type senderTest struct {
 	receiver *receiver
-	store    map[string]*Block
+	store    map[string]common.Block
 	times    int32
 }
 
 func (self *senderTest) sendA(tasks []hashTask) {
 	go func() {
-		var blocks []Block
+		var blocks []common.Block
 
 		for _, task := range tasks {
 			block, ok := self.store[task.hash]
 			if ok {
-				blocks = append(blocks, *block)
+				blocks = append(blocks, block)
 			}
 		}
 		if len(blocks) > 0 {
@@ -44,9 +46,9 @@ func (self *senderTest) sendB(task hashTask, prevCnt int) {
 	}()
 }
 
-func (self *senderTest) handle(blocks []Block) {
+func (self *senderTest) handle(blocks []common.Block) {
 	for _, block := range blocks {
-		fmt.Println("receive block: ", block.String())
+		fmt.Printf("receive block: %v\n", block)
 		atomic.CompareAndSwapInt32(&self.times, self.times, self.times+1)
 	}
 }
@@ -97,11 +99,11 @@ func genFetchHash(N int) []hashTask {
 	return hashes
 }
 
-func genBlockStore(N int) map[string]*Block {
-	hashes := make(map[string]*Block)
+func genBlockStore(N int) map[string]common.Block {
+	hashes := make(map[string]common.Block)
 	for i := 0; i < N; i++ {
 		height := N + i
-		hashes[genHashByHeight(height)] = &Block{height: height, hash: genHashByHeight(height), prev: genPrevHashByHeight(height)}
+		hashes[genHashByHeight(height)] = &test.TestBlock{Theight: height, Thash: genHashByHeight(height), TpreHash: genPrevHashByHeight(height)}
 	}
 	return hashes
 }
