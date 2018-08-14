@@ -1,12 +1,14 @@
 package pool
 
 import (
+	"errors"
+	"sync"
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/verifier"
-	"sync"
-	"time"
 )
 
 type accountReader interface {
@@ -42,7 +44,7 @@ func (self *AccountPool) TryRollback(rollbackHeight int, rollbackHash string) ([
 	{ // check logic
 		w := self.chainpool.diskChain.getBlock(rollbackHeight, false)
 		if w == nil || w.block.Hash() != rollbackHash {
-			return nil, common.StrError{"error rollback cmd."}
+			return nil, errors.New("error rollback cmd.")
 		}
 	}
 

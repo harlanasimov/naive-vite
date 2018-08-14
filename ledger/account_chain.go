@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"errors"
 	"github.com/golang-collections/collections/stack"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
@@ -85,7 +86,7 @@ func (self *AccountChain) removeChain(b common.Block) error {
 	block := b.(*common.AccountStateBlock)
 	has := self.hasSnapshotPoint(block.Height(), block.Hash())
 	if has {
-		return common.StrError{"has snapshot."}
+		return errors.New("has snapshot.")
 	}
 
 	head := self.accountDB[block.PreHash()]
@@ -136,7 +137,7 @@ func (self *AccountChain) SnapshotPoint(snapshotHeight int, snapshotHash string,
 	// check valid
 	head := self.head
 	if head == nil {
-		return common.StrError{E: "account[" + self.address + "] not exist."}
+		return errors.New("account[" + self.address + "] not exist.")
 	}
 	if h.Hash == head.Hash() && h.Height == head.Height() {
 		point := &common.SnapshotPoint{SnapshotHeight: snapshotHeight, SnapshotHash: snapshotHash, AccountHash: h.Hash, AccountHeight: h.Height}
@@ -147,22 +148,22 @@ func (self *AccountChain) SnapshotPoint(snapshotHeight int, snapshotHash string,
 		"accHash:" + h.Hash +
 		" expAccHeight:" + strconv.Itoa(head.Height()) +
 		" expAccHash:" + head.Hash()
-	return common.StrError{E: errMsg}
+	return errors.New(errMsg)
 }
 
 //SnapshotPoint ddd
 func (self *AccountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end *common.SnapshotPoint) error {
 	point := self.peek()
 	if point == nil {
-		return common.StrError{"not exist snapshot point."}
+		return errors.New("not exist snapshot point.")
 	}
 	if !point.Equals(start) {
-		return common.StrError{"not equals for start"}
+		return errors.New("not equals for start")
 	}
 	for {
 		point := self.peek()
 		if point == nil {
-			return common.StrError{"not exist snapshot point."}
+			return errors.New("not exist snapshot point.")
 		}
 		if point.AccountHeight <= end.AccountHeight {
 			self.snapshotPoint.Pop()
@@ -179,7 +180,7 @@ func (self *AccountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end
 //func (self *AccountChain) rollbackSnapshotPoint(start *common.SnapshotPoint) error {
 //	point := self.peek()
 //	if point == nil {
-//		return common.StrError{"not exist snapshot point."}
+//		return errors.New("not exist snapshot point."}
 //	}
 //
 //	if point.SnapshotHash == start.SnapshotHash &&
@@ -192,7 +193,7 @@ func (self *AccountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end
 //
 //	errMsg := "account[" + self.address + "] state error. expect:" + point.String() +
 //		", actual:" + start.String()
-//	return common.StrError{E: errMsg}
+//	return errors.New( errMsg}
 //}
 
 //SnapshotPoint ddd

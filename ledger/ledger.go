@@ -1,14 +1,16 @@
 package ledger
 
 import (
+	"errors"
+	"sync"
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
-	"sync"
-	"time"
 )
 
 type Ledger interface {
@@ -47,11 +49,11 @@ type ledger struct {
 func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, error) {
 	ac := self.selfAc(address)
 	if ac == nil {
-		return nil, common.StrError{"account not exist."}
+		return nil, errors.New("account not exist.")
 	}
 	head := ac.Head()
 	if head == nil {
-		return nil, common.StrError{"head not exist."}
+		return nil, errors.New("head not exist.")
 	}
 	block := head.(*common.AccountStateBlock)
 	return block, nil
@@ -60,7 +62,7 @@ func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, erro
 func (self *ledger) HeadSnapshost() (*common.SnapshotBlock, error) {
 	head := self.sc.Head()
 	if head == nil {
-		return nil, common.StrError{"head not exist."}
+		return nil, errors.New("head not exist.")
 	}
 	block := head.(*common.SnapshotBlock)
 	return block, nil
@@ -70,7 +72,7 @@ func (self *ledger) CreateAccount(address string) error {
 	head := self.sc.Head()
 	if self.ac[address] != nil {
 		log.Warn("exist account for %s.", address)
-		return common.StrError{"exist account " + address}
+		return errors.New("exist account " + address)
 	}
 	accountChain := NewAccountChain(address, self.reqPool, head.Height(), head.Hash())
 	accountPool := pool.NewAccountPool("accountChainPool-" + address)
@@ -134,15 +136,15 @@ func (self *ledger) RequestAccountBlock(account string, block *common.AccountSta
 func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string) error {
 	fromAc := self.selfAc(from)
 	if fromAc == nil {
-		return common.StrError{"not exist for account[" + from + "]"}
+		return errors.New("not exist for account[" + from + "]")
 	}
 	toAc := self.selfAc(to)
 	if toAc == nil {
-		return common.StrError{"not exist for account[" + to + "]"}
+		return errors.New("not exist for account[" + to + "]")
 	}
 	b := fromAc.GetBlockByHash(reqHash)
 	if b == nil {
-		return common.StrError{"not exist for account[" + from + "]block[" + reqHash + "]"}
+		return errors.New("not exist for account[" + from + "]block[" + reqHash + "]")
 	}
 
 	reqBlock := b.(*common.AccountStateBlock)

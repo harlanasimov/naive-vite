@@ -1,18 +1,19 @@
 package pool
 
 import (
-	"sort"
-	"sync"
-
+	"errors"
 	"fmt"
+	"sort"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
-	"strconv"
-	"sync/atomic"
-	"time"
 )
 
 type PoolReader interface {
@@ -281,7 +282,7 @@ func (self *chainPool) currentModifyToChain(chain *forkedChain) error {
 	w := chain.getBlock(head.Height(), true)
 	if w == nil ||
 		w.block.Hash() != head.Hash() {
-		return common.StrError{"error"}
+		return errors.New("error")
 	}
 	for chain.referChain.id() != self.diskChain.id() {
 		fromChain := chain.referChain.(*forkedChain)
@@ -514,7 +515,7 @@ func (self *chainPool) rollback(newHeight int) error {
 		if self.current.tailHeight != head.Height() ||
 			self.current.tailHash != head.Hash() {
 			log.Error("error rollback. pool:%s, rollback:%d", self.poolId, newHeight)
-			return common.StrError{"rollback fail."}
+			return errors.New("rollback fail.")
 		}
 	}
 	return nil
@@ -809,16 +810,16 @@ func (self *BCPool) AddDirectBlock(block common.Block) error {
 	result := stat.VerifyResult()
 	switch result {
 	case verifier.PENDING:
-		return common.StrError{"add pending."}
+		return errors.New("add pending.")
 	case verifier.FAIL:
-		return common.StrError{"add error."}
+		return errors.New("add error.")
 	case verifier.SUCCESS:
 		self.chainpool.insertChainFn(block, forkVersion)
 		head := self.chainpool.diskChain.Head()
 		self.chainpool.insertNotify(head)
 		return nil
 	default:
-		return common.StrError{"add unexpected."}
+		return errors.New("add unexpected.")
 	}
 }
 func (self *BCPool) LoopAppendChains() {
@@ -925,14 +926,14 @@ func (self *BCPool) currentModify(forkHeight int, forkHash string) error {
 
 	_, forkBlock, err := self.getForkPointByChains(finalChain, self.chainpool.current)
 	if err != nil {
-		return common.StrError{"can't find fork point."}
+		return errors.New("can't find fork point.")
 	}
 
 	//self.chainpool.getSendBlock(forkBlock.Height())
 
 	err = self.chainpool.rollback(forkBlock.Height())
 	if err != nil {
-		return common.StrError{"rollback fail."}
+		return errors.New("rollback fail.")
 	}
 	return self.chainpool.currentModifyToChain(finalChain)
 }
@@ -978,12 +979,12 @@ func (self *BCPool) getForkPoint(longest Chain, current Chain) (common.Block, co
 		curBlock := current.GetBlock(i)
 		if block == nil {
 			log.Error("longest chain is not longest. chainId:%s. height:%d", longest.ChainId(), i)
-			return nil, nil, common.StrError{"longest chain error."}
+			return nil, nil, errors.New("longest chain error.")
 		}
 
 		if curBlock == nil {
 			log.Error("current chain is wrong. chainId:%s. height:%d", current.ChainId(), i)
-			return nil, nil, common.StrError{"current chain error."}
+			return nil, nil, errors.New("current chain error.")
 		}
 
 		if block.Hash() == curBlock.Hash() {
@@ -993,7 +994,7 @@ func (self *BCPool) getForkPoint(longest Chain, current Chain) (common.Block, co
 		}
 		i = i - 1
 	}
-	return nil, nil, common.StrError{"can't find fork point"}
+	return nil, nil, errors.New("can't find fork point")
 }
 
 func (self *BCPool) loop() {
