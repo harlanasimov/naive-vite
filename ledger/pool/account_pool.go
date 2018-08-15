@@ -7,7 +7,6 @@ import (
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/verifier"
 )
 
@@ -30,7 +29,7 @@ func NewAccountPool(name string) *AccountPool {
 func (self *AccountPool) Init(insertChainFn insertChainForkCheck,
 	removeChainFn removeChainForkCheck,
 	verifier verifier.Verifier,
-	syncer syncer.Syncer,
+	syncer *fetcher,
 	reader ChainReader,
 	mu sync.Locker,
 	accountReader accountReader) {

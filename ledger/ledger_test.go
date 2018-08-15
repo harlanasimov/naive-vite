@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"fmt"
+
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
@@ -23,7 +24,7 @@ func TestTime(t *testing.T) {
 }
 
 func TestLedger(t *testing.T) {
-	testSyncer := &test.TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer := test.NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 
@@ -87,7 +88,7 @@ func TestLedger(t *testing.T) {
 }
 
 func TestSnapshotFork(t *testing.T) {
-	testSyncer := &test.TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer := test.NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
@@ -129,7 +130,7 @@ func TestSnapshotFork(t *testing.T) {
 }
 
 func TestAccountFork(t *testing.T) {
-	testSyncer := &test.TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer := test.NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
@@ -205,10 +206,9 @@ func TestMap(t *testing.T) {
 }
 
 func TestLedger_MiningSnapshotBlock(t *testing.T) {
-	testSyncer := &test.TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer := test.NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
-
 }
 
 func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW) (*miner.Miner, EventBus.Bus) {
@@ -225,7 +225,7 @@ func genCommitee() *consensus.Committee {
 }
 
 func TestNewMiner(t *testing.T) {
-	testSyncer := &test.TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer := test.NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 

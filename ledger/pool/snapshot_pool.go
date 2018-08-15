@@ -1,14 +1,14 @@
 package pool
 
 import (
+	"sync"
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
-	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
-	"sync"
-	"time"
 )
 
 type SnapshotPool struct {
@@ -26,7 +26,7 @@ func NewSnapshotPool(name string) *SnapshotPool {
 func (self *SnapshotPool) Init(insertChainFn insertChainForkCheck,
 	removeChainFn removeChainForkCheck,
 	verifier verifier.Verifier,
-	syncer syncer.Syncer,
+	syncer *fetcher,
 	reader ChainReader,
 	rwMu *sync.RWMutex,
 	accountsConsensus consensus.AccountsConsensus) {

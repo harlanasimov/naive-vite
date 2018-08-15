@@ -11,7 +11,9 @@ type BlockHash struct {
 }
 
 type Syncer interface {
-	Fetch(hash common.HashHeight, prevCnt int)
+	Fetcher() Fetcher
+	Sender() Sender
+	Handlers() Handlers
 }
 
 type Fetcher interface {
@@ -44,4 +46,30 @@ type MsgHandler interface {
 type Handlers interface {
 	RegisterHandler(p2p.NetMsgType, MsgHandler)
 	UnRegisterHandler(p2p.NetMsgType, MsgHandler)
+}
+
+type syncer struct {
+	sender   *sender
+	fetcher  *fetcher
+	receiver *receiver
+}
+
+func NewSyncer(net p2p.P2P) Syncer {
+	self := &syncer{}
+	self.sender = &sender{net: net}
+	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
+	self.receiver = NewReceiver(self.fetcher)
+	return self
+}
+
+func (self *syncer) Fetcher() Fetcher {
+	return self.fetcher
+}
+
+func (self *syncer) Sender() Sender {
+	return self.sender
+}
+
+func (self *syncer) Handlers() Handlers {
+	return self.receiver
 }

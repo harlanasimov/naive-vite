@@ -11,7 +11,6 @@ import (
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
 )
@@ -44,7 +43,7 @@ type BCPool struct {
 	Id        string
 	blockpool *blockPool
 	chainpool *chainPool
-	syncer    syncer.Syncer
+	syncer    *fetcher
 	verifier  verifier.Verifier
 }
 
@@ -226,7 +225,7 @@ func newBlockChainPool(name string) *BCPool {
 func (self *BCPool) init(insertChainFn insertChainForkCheck,
 	removeChainFn removeChainForkCheck,
 	verifier verifier.Verifier,
-	syncer syncer.Syncer,
+	syncer *fetcher,
 	reader ChainReader) {
 
 	diskChain := &diskChain{chainId: self.Id + "-diskchain", reader: reader}
@@ -865,7 +864,7 @@ func (self *BCPool) LoopFetchForSnippets() {
 
 		if diff > 1 {
 			hash := common.HashHeight{Hash: w.tailHash, Height: w.tailHeight}
-			self.syncer.Fetch(hash, diff)
+			self.syncer.fetch(hash, diff)
 		}
 		prev = w.headHeight
 	}
@@ -893,7 +892,7 @@ func (self *BCPool) whichChain(height int, hash string) *forkedChain {
 	if finalChain == nil {
 		// todo fetch data
 		head := self.chainpool.diskChain.Head()
-		self.syncer.Fetch(common.HashHeight{Height: height, Hash: hash}, height-head.Height())
+		self.syncer.fetch(common.HashHeight{Height: height, Hash: hash}, height-head.Height())
 		log.Warn("block chain can't find. poolId:%s, height:%d, hash:%s", self.chainpool.poolId, height, hash)
 		return nil
 	}
@@ -916,7 +915,7 @@ func (self *BCPool) currentModify(forkHeight int, forkHash string) error {
 	if finalChain == nil {
 		// todo fetch data
 		head := self.chainpool.diskChain.Head()
-		self.syncer.Fetch(common.HashHeight{Height: forkHeight, Hash: forkHash}, forkHeight-head.Height())
+		self.syncer.fetch(common.HashHeight{Height: forkHeight, Hash: forkHash}, forkHeight-head.Height())
 		log.Warn("account can't fork. poolId:%s, height:%d, hash:%s", self.chainpool.poolId, forkHeight, forkHash)
 		return nil
 	}

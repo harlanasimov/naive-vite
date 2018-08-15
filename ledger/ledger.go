@@ -76,7 +76,8 @@ func (self *ledger) CreateAccount(address string) error {
 	}
 	accountChain := NewAccountChain(address, self.reqPool, head.Height(), head.Hash())
 	accountPool := pool.NewAccountPool("accountChainPool-" + address)
-	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, self.syncer, accountChain, self.rwMutex.RLocker(), accountChain)
+
+	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, pool.NewFetcher(address, self.syncer.Fetcher()), accountChain, self.rwMutex.RLocker(), accountChain)
 	self.ac[address] = accountChain
 	self.pendingAc[address] = accountPool
 	accountPool.Start()
@@ -309,7 +310,7 @@ func NewLedger(syncer syncer.Syncer) *ledger {
 	snapshotPool.Init(sc.insertChain,
 		sc.removeChain,
 		ledger.snapshotVerifier,
-		ledger.syncer,
+		pool.NewFetcher("", syncer.Fetcher()),
 		sc,
 		ledger.rwMutex,
 		ledger)
@@ -321,7 +322,7 @@ func NewLedger(syncer syncer.Syncer) *ledger {
 	for _, account := range accounts {
 		ac := NewAccountChain(account, ledger.reqPool, sc.head.Height(), sc.head.Hash())
 		accountPool := pool.NewAccountPool("accountChainPool-" + account)
-		accountPool.Init(ac.insertChain, ac.removeChain, ledger.accountVerifier, ledger.syncer, ac, ledger.rwMutex.RLocker(), ac)
+		accountPool.Init(ac.insertChain, ac.removeChain, ledger.accountVerifier, pool.NewFetcher(account, syncer.Fetcher()), ac, ledger.rwMutex.RLocker(), ac)
 		acs[account] = ac
 		acPools[account] = accountPool
 	}

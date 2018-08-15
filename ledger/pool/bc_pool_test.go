@@ -1,13 +1,14 @@
 package pool
 
 import (
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/test"
 	"github.com/viteshan/naive-vite/verifier"
-	"strconv"
-	"testing"
-	"time"
 )
 
 type TestVerifier struct {
@@ -79,7 +80,7 @@ func (self *TestChainReader) removeChain(block common.Block) error {
 	delete(self.store, block.Height())
 	return nil
 }
-func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
+func (self *TestSyncer) fetch(hash common.HashHeight, prevCnt int) {
 	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
 	go func() {
 		prev := hash.Hash
@@ -96,6 +97,13 @@ func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
 		}
 
 	}()
+}
+func (self *TestSyncer) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
+	self.fetch(hash, prevCnt)
+}
+
+func (self *TestSyncer) FetchSnapshot(hash common.HashHeight, prevCnt int) {
+	self.fetch(hash, prevCnt)
 }
 
 func (self *TestSyncer) genLinkedData() {
@@ -137,7 +145,7 @@ func TestBcPool(t *testing.T) {
 	testSyncer.genLinkedData()
 	pool := newBlockChainPool("bcPool-1")
 	testSyncer.pool = pool
-	pool.init(reader.insertChain, reader.removeChain, &TestVerifier{}, testSyncer, reader)
+	pool.init(reader.insertChain, reader.removeChain, &TestVerifier{}, NewFetcher("", testSyncer), reader)
 	go pool.loop()
 	pool.AddBlock(&test.TestBlock{Thash: "A-6", Theight: 6, TpreHash: "A-5", Tsigner: signer, Ttimestamp: time.Now()})
 	time.Sleep(time.Second)
