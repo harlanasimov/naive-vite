@@ -60,12 +60,12 @@ func cliBootNode(addr string, id int) *websocket.Conn {
 	if err != nil {
 		log.Error("dial:", err)
 	}
-	c.WriteJSON(&Req{Id: id, Addr: addr})
+	c.WriteJSON(&bootReq{Id: id, Addr: addr})
 	return c
 }
 
 func contain(conn *websocket.Conn, targetAddr string, targetId int) (bool, error) {
-	conn.WriteJSON(&Req{Tp: 1})
+	conn.WriteJSON(&bootReq{Tp: 1})
 	log.Info("send request.")
 	_, message, err := conn.ReadMessage()
 	if err != nil {
@@ -73,7 +73,7 @@ func contain(conn *websocket.Conn, targetAddr string, targetId int) (bool, error
 		return false, err
 	}
 	log.Info("recv: %s", string(message))
-	res := []Req{}
+	res := []bootReq{}
 	json.Unmarshal(message, &res)
 	result := false
 	for _, r := range res {

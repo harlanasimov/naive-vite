@@ -46,7 +46,7 @@ func (self *linker) loopRead(conn *websocket.Conn) {
 			return
 		}
 		//log.Info("recv: %s", string(message))
-		res := []Req{}
+		res := []bootReq{}
 		json.Unmarshal(message, &res)
 		for _, r := range res {
 			id := r.Id
@@ -66,13 +66,13 @@ func (self *linker) loopWrite(conn *websocket.Conn) {
 	ticker := time.NewTicker(8 * time.Second)
 	defer ticker.Stop()
 
-	conn.WriteJSON(&Req{Id: self.p2p.id, Addr: self.p2p.addr})
+	conn.WriteJSON(&bootReq{Id: self.p2p.id, Addr: self.p2p.addr})
 	for {
 		select {
 		case <-self.closed:
 			return
 		case <-ticker.C:
-			err := conn.WriteJSON(&Req{Tp: 1})
+			err := conn.WriteJSON(&bootReq{Tp: 1})
 			if err != nil {
 				return
 			}

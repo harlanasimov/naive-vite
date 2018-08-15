@@ -26,8 +26,8 @@ var upgrader = websocket.Upgrader{} // use default options
 func (self *server) ws(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err == nil {
-		c.WriteJSON(Req{Id: self.p2p.id, Addr: self.p2p.addr})
-		req := Req{}
+		c.WriteJSON(bootReq{Id: self.p2p.id, Addr: self.p2p.addr})
+		req := bootReq{}
 		c.ReadJSON(&req)
 		log.Info("upgrade success, add new peer.%v", req)
 		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))
@@ -60,8 +60,8 @@ func (self *dial) connect(addr string) bool {
 	u := url.URL{Scheme: "ws", Host: addr, Path: "/ws"}
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err == nil {
-		c.WriteJSON(Req{Id: self.p2p.id, Addr: self.p2p.addr})
-		req := Req{}
+		c.WriteJSON(bootReq{Id: self.p2p.id, Addr: self.p2p.addr})
+		req := bootReq{}
 		c.ReadJSON(&req)
 		log.Info("client connect success, add new peer.%v", req)
 		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))

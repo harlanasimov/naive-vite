@@ -52,7 +52,7 @@ func (self *bootnode) loopread(peer *peer) {
 		case <-peer.closed:
 			return
 		default:
-			req := Req{}
+			req := bootReq{}
 			err := conn.ReadJSON(&req)
 			if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
 				log.Error("read message error, peer: %s, %v", peer.info(), err)
@@ -103,7 +103,7 @@ func (self *bootnode) start(addr string) {
 func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err == nil {
-		req := Req{}
+		req := bootReq{}
 		err = c.ReadJSON(&req)
 		if err != nil {
 			log.Info("read fail.", err)
@@ -124,10 +124,10 @@ func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (self *bootnode) allPeer() []*Peer {
-	var results []*Peer
+func (self *bootnode) allPeer() []*bootLinkPeer {
+	var results []*bootLinkPeer
 	for _, peer := range self.peers {
-		results = append(results, &Peer{Id: peer.peerId, Addr: peer.peerSrvAddr})
+		results = append(results, &bootLinkPeer{Id: peer.peerId, Addr: peer.peerSrvAddr})
 	}
 	return results
 }
@@ -139,12 +139,12 @@ func (self bootnode) stop() {
 
 }
 
-type Peer struct {
+type bootLinkPeer struct {
 	Id   int
 	Addr string
 }
 
-type Req struct {
+type bootReq struct {
 	Tp   int
 	Id   int
 	Addr string
