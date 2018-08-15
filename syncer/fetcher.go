@@ -3,12 +3,9 @@ package syncer
 import (
 	"sync"
 	"time"
-)
 
-type sender interface {
-	sendA(tasks []hashTask)
-	sendB(task hashTask, prevCnt int)
-}
+	"github.com/viteshan/naive-vite/common"
+)
 
 type retryPolicy interface {
 	retry(hash string) bool
@@ -87,32 +84,42 @@ func (self *defaultRetryPolicy) newRetryStatus() *RetryStatus {
 }
 
 type fetcher struct {
-	sender sender
+	sender Sender
 
 	retryPolicy retryPolicy
 }
 
-type hashTask struct {
-	height int
-	hash   string
+func (self *fetcher) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
+	self.sender.requestAccountHash(address, hash, prevCnt)
+}
+func (self *fetcher) FetchSnapshot(hash common.HashHeight, prevCnt int) {
+	self.sender.requestSnapshotHash(hash, prevCnt)
 }
 
-func (self *fetcher) fetchBlockByHash(tasks []hashTask) {
-	var target []hashTask
+func (self *fetcher) fetchSnapshotBlockByHash(tasks []common.HashHeight) {
+	var target []common.HashHeight
 	for _, task := range tasks {
-		if self.retryPolicy.retry(task.hash) {
+		if self.retryPolicy.retry(task.Hash) {
 			target = append(target, task)
 		}
 	}
 	if len(target) > 0 {
-		self.sender.sendA(target)
+		self.sender.requestSnapshotBlocks(target)
 	}
 }
 
-func (self *fetcher) fetchHash(hashTask hashTask, prevCnt int) {
-	self.sender.sendB(hashTask, prevCnt)
+func (self *fetcher) fetchAccountBlockByHash(address string, tasks []common.HashHeight) {
+	var target []common.HashHeight
+	for _, task := range tasks {
+		if self.retryPolicy.retry(task.Hash) {
+			target = append(target, task)
+		}
+	}
+	if len(target) > 0 {
+		self.sender.requestAccountBlocks(address, target)
+	}
 }
-func (self *fetcher) done(block string, height int) {
 
+func (self *fetcher) done(block string, height int) {
 	self.retryPolicy.done(block)
 }

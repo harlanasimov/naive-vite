@@ -2,48 +2,80 @@ package syncer
 
 import (
 	"fmt"
-	"github.com/viteshan/naive-vite/common"
-	"github.com/viteshan/naive-vite/test"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/p2p"
+	"github.com/viteshan/naive-vite/test"
 )
 
 type senderTest struct {
-	receiver *receiver
-	store    map[string]common.Block
-	times    int32
+	store   map[string]common.Block
+	fetcher *fetcher
+	times   int32
 }
 
-func (self *senderTest) sendA(tasks []hashTask) {
-	go func() {
-		var blocks []common.Block
-
-		for _, task := range tasks {
-			block, ok := self.store[task.hash]
-			if ok {
-				blocks = append(blocks, block)
-			}
-		}
-		if len(blocks) > 0 {
-			self.receiver.handleBlock(blocks)
-		}
-	}()
+func (self *senderTest) BroadcastAccountBlocks(address string, blocks []*common.AccountStateBlock) error {
+	panic("implement BroadcastAccountBlocks")
 }
 
-func (self *senderTest) sendB(task hashTask, prevCnt int) {
+func (self *senderTest) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) error {
+	panic("implement BroadcastSnapshotBlocks")
+}
+
+func (self *senderTest) SendAccountBlocks(address string, blocks []*common.AccountStateBlock, peer p2p.Peer) error {
+	panic("implement SendAccountBlocks")
+}
+
+func (self *senderTest) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer p2p.Peer) error {
+	panic("implement SendSnapshotBlocks")
+}
+
+func (self *senderTest) sendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
+	panic("implement sendAccountHashes")
+}
+
+func (self *senderTest) sendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
+	panic("implement sendSnapshotHashes")
+}
+
+func (self *senderTest) requestAccountHash(address string, height common.HashHeight, prevCnt int) error {
 	go func() {
-		var hashes []hashTask
-		height := task.height
+		var hashes []common.HashHeight
+		height := height.Height
 		for i := 1; i < prevCnt+1; i++ {
 			tmpH := height - i
-			hashes = append(hashes, hashTask{height: tmpH, hash: genHashByHeight(tmpH)})
+			hashes = append(hashes, common.HashHeight{Height: tmpH, Hash: genHashByHeight(tmpH)})
 		}
 		if len(hashes) > 0 {
-			self.receiver.handleHash(hashes)
+			self.fetcher.fetchAccountBlockByHash(address, hashes)
 		}
 	}()
+	return nil
+}
+
+func (self *senderTest) requestSnapshotHash(height common.HashHeight, prevCnt int) error {
+	panic("implement requestSnapshotHash")
+}
+
+func (self *senderTest) requestAccountBlocks(address string, hashes []common.HashHeight) error {
+	go func() {
+		for _, v := range hashes {
+			block, ok := self.store[v.Hash]
+			if ok {
+				fmt.Printf("receive block: %v\n", block)
+				atomic.CompareAndSwapInt32(&self.times, self.times, self.times+1)
+			}
+		}
+	}()
+
+	return nil
+}
+func (self *senderTest) requestSnapshotBlocks(hashes []common.HashHeight) error {
+	panic("implement requestSnapshotBlocks")
 }
 
 func (self *senderTest) handle(blocks []common.Block) {
@@ -54,47 +86,46 @@ func (self *senderTest) handle(blocks []common.Block) {
 }
 
 func TestFetcher(t *testing.T) {
+	address := "viteshan"
 	N := 10
-	receiver := &receiver{}
-	sender := &senderTest{receiver: receiver, store: genBlockStore(N)}
-	receiver.blockHandle = sender
+	sender := &senderTest{store: genBlockStore(N)}
 
 	fetcher := &fetcher{sender: sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
-	receiver.fetcher = fetcher
+	sender.fetcher = fetcher
 
-	fetcher.fetchBlockByHash(genFetchHash(N))
-	fetcher.fetchBlockByHash(genFetchHash(N + 10))
-	fetcher.fetchBlockByHash(genFetchHash(N + 5))
-	fetcher.fetchBlockByHash(genFetchHash(N * 2))
-	fetcher.fetchHash(hashTask{height: N, hash: genHashByHeight(N)}, N)
-	fetcher.fetchHash(hashTask{height: N + 5, hash: genHashByHeight(N + 5)}, N)
-	fetcher.fetchHash(hashTask{height: N * 2, hash: genHashByHeight(N * 2)}, N)
-	fetcher.fetchHash(hashTask{height: N * 3, hash: genHashByHeight(N * 3)}, N)
+	fetcher.fetchAccountBlockByHash(address, genFetchHash(N))
+	fetcher.fetchAccountBlockByHash(address, genFetchHash(N+10))
+	fetcher.fetchAccountBlockByHash(address, genFetchHash(N+5))
+	fetcher.fetchAccountBlockByHash(address, genFetchHash(N*2))
+	fetcher.FetchAccount(address, common.HashHeight{Height: N, Hash: genHashByHeight(N)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N + 5, Hash: genHashByHeight(N + 5)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 2, Hash: genHashByHeight(N * 2)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 3, Hash: genHashByHeight(N * 3)}, N)
 
-	fetcher.fetchHash(hashTask{height: N, hash: genHashByHeight(N)}, N)
-	fetcher.fetchHash(hashTask{height: N + 5, hash: genHashByHeight(N + 5)}, N)
-	fetcher.fetchHash(hashTask{height: N * 2, hash: genHashByHeight(N * 2)}, N)
-	fetcher.fetchHash(hashTask{height: N * 3, hash: genHashByHeight(N * 3)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N, Hash: genHashByHeight(N)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N + 5, Hash: genHashByHeight(N + 5)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 2, Hash: genHashByHeight(N * 2)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 3, Hash: genHashByHeight(N * 3)}, N)
 
-	fetcher.fetchHash(hashTask{height: N, hash: genHashByHeight(N)}, N)
-	fetcher.fetchHash(hashTask{height: N + 5, hash: genHashByHeight(N + 5)}, N)
-	fetcher.fetchHash(hashTask{height: N * 2, hash: genHashByHeight(N * 2)}, N)
-	fetcher.fetchHash(hashTask{height: N * 3, hash: genHashByHeight(N * 3)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N, Hash: genHashByHeight(N)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N + 5, Hash: genHashByHeight(N + 5)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 2, Hash: genHashByHeight(N * 2)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 3, Hash: genHashByHeight(N * 3)}, N)
 
-	fetcher.fetchHash(hashTask{height: N, hash: genHashByHeight(N)}, N)
-	fetcher.fetchHash(hashTask{height: N + 5, hash: genHashByHeight(N + 5)}, N)
-	fetcher.fetchHash(hashTask{height: N * 2, hash: genHashByHeight(N * 2)}, N)
-	fetcher.fetchHash(hashTask{height: N * 3, hash: genHashByHeight(N * 3)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N, Hash: genHashByHeight(N)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N + 5, Hash: genHashByHeight(N + 5)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 2, Hash: genHashByHeight(N * 2)}, N)
+	fetcher.FetchAccount(address, common.HashHeight{Height: N * 3, Hash: genHashByHeight(N * 3)}, N)
 
 	time.Sleep(2 * time.Second)
 	if N != int(sender.times) {
 		t.Errorf("error result. expect:%d, actual:%d", N, sender.times)
 	}
 }
-func genFetchHash(N int) []hashTask {
-	var hashes []hashTask
+func genFetchHash(N int) []common.HashHeight {
+	var hashes []common.HashHeight
 	for i := 0; i < N; i++ {
-		hashes = append(hashes, hashTask{N, genHashByHeight(N)})
+		hashes = append(hashes, common.HashHeight{Height: N, Hash: genHashByHeight(N)})
 	}
 	return hashes
 }
