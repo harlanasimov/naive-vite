@@ -24,16 +24,23 @@ type Msg struct {
 	data []byte
 }
 
+func (self *Msg) Type() common.NetMsgType {
+	return self.t
+}
+func (self *Msg) Data() []byte {
+	return self.data
+}
+
 func NewMsg(t common.NetMsgType, data []byte) *Msg {
 	return &Msg{t: t, data: data}
 }
 
-type msgHandle func(common.NetMsgType, []byte, Peer)
+type MsgHandle func(common.NetMsgType, []byte, Peer)
 
 type P2P interface {
 	BestPeer() (Peer, error)
 	AllPeer() ([]Peer, error)
-	SetHandlerFn(msgHandle)
+	SetHandlerFn(MsgHandle)
 }
 
 type p2p struct {
@@ -48,7 +55,7 @@ type p2p struct {
 	addr         string
 	closed       chan struct{}
 	loopWg       sync.WaitGroup
-	msgHandleFn  msgHandle
+	msgHandleFn  MsgHandle
 }
 
 func (self *p2p) BestPeer() (Peer, error) {
@@ -71,7 +78,7 @@ func (self *p2p) AllPeer() ([]Peer, error) {
 	return nil, errors.New("can't find best peer.")
 }
 
-func (self *p2p) SetHandlerFn(msgHandle) {
+func (self *p2p) SetHandlerFn(MsgHandle) {
 	panic("implement me")
 }
 

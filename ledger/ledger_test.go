@@ -2,18 +2,52 @@ package ledger
 
 import (
 	"fmt"
+	"testing"
+	"time"
 
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/miner"
+	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/test"
 	"github.com/viteshan/naive-vite/tools"
-
-	"testing"
-	"time"
 )
+
+type TestSyncer struct {
+	Blocks map[string]*test.TestBlock
+	f      syncer.Fetcher
+}
+
+func NewTestSync() *TestSyncer {
+	testSyncer := &TestSyncer{Blocks: make(map[string]*test.TestBlock)}
+	testSyncer.f = &TestFetcher{}
+	return testSyncer
+}
+
+func (self *TestSyncer) Fetcher() syncer.Fetcher {
+	return self.f
+}
+
+func (self *TestSyncer) Sender() syncer.Sender {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Handlers() syncer.Handlers {
+	panic("implement me")
+}
+
+type TestFetcher struct {
+}
+
+func (*TestFetcher) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
+	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
+}
+
+func (*TestFetcher) FetchSnapshot(hash common.HashHeight, prevCnt int) {
+	log.Info("fetch request,cnt:%d, hash:%v", prevCnt, hash)
+}
 
 func TestTime(t *testing.T) {
 	now := time.Now()
@@ -24,7 +58,7 @@ func TestTime(t *testing.T) {
 }
 
 func TestLedger(t *testing.T) {
-	testSyncer := test.NewTestSync()
+	testSyncer := NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 
@@ -88,7 +122,7 @@ func TestLedger(t *testing.T) {
 }
 
 func TestSnapshotFork(t *testing.T) {
-	testSyncer := test.NewTestSync()
+	testSyncer := NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
@@ -130,7 +164,7 @@ func TestSnapshotFork(t *testing.T) {
 }
 
 func TestAccountFork(t *testing.T) {
-	testSyncer := test.NewTestSync()
+	testSyncer := NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
@@ -206,7 +240,7 @@ func TestMap(t *testing.T) {
 }
 
 func TestLedger_MiningSnapshotBlock(t *testing.T) {
-	testSyncer := test.NewTestSync()
+	testSyncer := NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 }
@@ -225,7 +259,7 @@ func genCommitee() *consensus.Committee {
 }
 
 func TestNewMiner(t *testing.T) {
-	testSyncer := test.NewTestSync()
+	testSyncer := NewTestSync()
 	ledger := NewLedger(testSyncer)
 	ledger.Start()
 

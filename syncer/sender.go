@@ -121,7 +121,7 @@ func (self *sender) requestAccountHash(address string, height common.HashHeight,
 	}
 	m := requestAccountHashMsg{address: address, height: height.Height, hash: height.Hash, prevCnt: prevCnt}
 	bytM, err := json.Marshal(&m)
-	if err == nil {
+	if err != nil {
 		return errors.New("sendAccountHash, format fail. err:" + err.Error())
 	}
 	msg := p2p.NewMsg(common.RequestAccountHash, bytM)
