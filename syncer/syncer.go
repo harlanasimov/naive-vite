@@ -39,13 +39,13 @@ type Sender interface {
 	requestSnapshotBlocks([]common.HashHeight) error
 }
 type MsgHandler interface {
-	Handle(p2p.NetMsgType, interface{}, p2p.Peer)
+	Handle(common.NetMsgType, []byte, p2p.Peer)
 	Id() string
 }
 
 type Handlers interface {
-	RegisterHandler(p2p.NetMsgType, MsgHandler)
-	UnRegisterHandler(p2p.NetMsgType, MsgHandler)
+	RegisterHandler(common.NetMsgType, MsgHandler)
+	UnRegisterHandler(common.NetMsgType, MsgHandler)
 }
 
 type syncer struct {

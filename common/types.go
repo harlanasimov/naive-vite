@@ -81,38 +81,38 @@ func (self BlockType) String() string {
 	return "Unknown"
 }
 
-type block struct {
-	height    int
-	hash      string
-	preHash   string
-	signer    string
-	timestamp time.Time
+type Tblock struct {
+	Theight    int
+	Thash      string
+	TpreHash   string
+	Tsigner    string
+	Ttimestamp time.Time
 }
 
-func (self *block) Height() int {
-	return self.height
+func (self *Tblock) Height() int {
+	return self.Theight
 }
 
-func (self *block) Hash() string {
-	return self.hash
+func (self *Tblock) Hash() string {
+	return self.Thash
 }
 
-func (self *block) PreHash() string {
-	return self.preHash
+func (self *Tblock) PreHash() string {
+	return self.TpreHash
 }
 
-func (self *block) Signer() string {
-	return self.signer
+func (self *Tblock) Signer() string {
+	return self.Tsigner
 }
-func (self *block) Timestamp() time.Time {
-	return self.timestamp
+func (self *Tblock) Timestamp() time.Time {
+	return self.Ttimestamp
 }
-func (self *block) SetHash(hash string) {
-	self.hash = hash
+func (self *Tblock) SetHash(hash string) {
+	self.Thash = hash
 }
 
 type AccountStateBlock struct {
-	block
+	Tblock
 	Amount         int // the balance
 	ModifiedAmount int
 	SnapshotHeight int
@@ -120,11 +120,11 @@ type AccountStateBlock struct {
 	BlockType      BlockType // 1: send  2:received
 	From           string
 	To             string
-	SourceHash     string // source Block hash
+	SourceHash     string // source Block Thash
 }
 
 type SnapshotBlock struct {
-	block
+	Tblock
 	Accounts []*AccountHashH
 }
 
@@ -138,11 +138,11 @@ func NewSnapshotBlock(
 ) *SnapshotBlock {
 
 	block := &SnapshotBlock{}
-	block.height = height
-	block.hash = hash
-	block.preHash = preHash
-	block.signer = signer
-	block.timestamp = timestamp
+	block.Theight = height
+	block.Thash = hash
+	block.TpreHash = preHash
+	block.Tsigner = signer
+	block.Ttimestamp = timestamp
 	block.Accounts = accounts
 	return block
 }
@@ -175,11 +175,11 @@ func NewAccountBlock(
 ) *AccountStateBlock {
 
 	block := &AccountStateBlock{}
-	block.height = height
-	block.hash = hash
-	block.preHash = preHash
-	block.signer = signer
-	block.timestamp = timestamp
+	block.Theight = height
+	block.Thash = hash
+	block.TpreHash = preHash
+	block.Tsigner = signer
+	block.Ttimestamp = timestamp
 	block.Amount = amount
 	block.ModifiedAmount = modifiedAmount
 	block.SnapshotHash = snapshotHash
@@ -190,3 +190,16 @@ func NewAccountBlock(
 	block.SourceHash = sourceHash
 	return block
 }
+
+type NetMsgType int
+
+const (
+	RequestAccountHash    NetMsgType = 102
+	RequestSnapshotHash   NetMsgType = 103
+	RequestAccountBlocks  NetMsgType = 104
+	RequestSnapshotBlocks NetMsgType = 105
+	AccountHashes         NetMsgType = 121
+	SnapshotHashes        NetMsgType = 122
+	AccountBlocks         NetMsgType = 123
+	SnapshotBlocks        NetMsgType = 124
+)

@@ -15,7 +15,7 @@ type sender struct {
 
 func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.AccountStateBlock) error {
 	bytM, err := json.Marshal(&accountBlocksMsg{address: address, blocks: blocks})
-	msg := p2p.NewMsg(p2p.AccountBlocks, bytM)
+	msg := p2p.NewMsg(common.AccountBlocks, bytM)
 
 	if err == nil {
 		return errors.New("BroadcastAccountBlocks, format fail. err:" + err.Error())
@@ -38,7 +38,7 @@ func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.Acco
 
 func (self *sender) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) error {
 	bytM, err := json.Marshal(&snapshotBlocksMsg{blocks: blocks})
-	msg := p2p.NewMsg(p2p.SnapshotBlocks, bytM)
+	msg := p2p.NewMsg(common.SnapshotBlocks, bytM)
 
 	if err == nil {
 		return errors.New("BroadcastSnapshotBlocks, format fail. err:" + err.Error())
@@ -64,7 +64,7 @@ func (self *sender) SendAccountBlocks(address string, blocks []*common.AccountSt
 	if err == nil {
 		return errors.New("SendAccountBlocks, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.AccountBlocks, bytM)
+	msg := p2p.NewMsg(common.AccountBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("SendAccountBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -77,7 +77,7 @@ func (self *sender) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer p2p.
 	if err == nil {
 		return errors.New("SendSnapshotBlocks, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.SnapshotBlocks, bytM)
+	msg := p2p.NewMsg(common.SnapshotBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("SendSnapshotBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -91,7 +91,7 @@ func (self *sender) sendAccountHashes(address string, hashes []common.HashHeight
 	if err == nil {
 		return errors.New("sendAccountHashes, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.AccountHashes, bytM)
+	msg := p2p.NewMsg(common.AccountHashes, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("sendAccountHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -104,7 +104,7 @@ func (self *sender) sendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer
 	if err == nil {
 		return errors.New("sendSnapshotHashes, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.SnapshotHashes, bytM)
+	msg := p2p.NewMsg(common.SnapshotHashes, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("sendSnapshotHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -124,7 +124,7 @@ func (self *sender) requestAccountHash(address string, height common.HashHeight,
 	if err == nil {
 		return errors.New("sendAccountHash, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.RequestAccountHash, bytM)
+	msg := p2p.NewMsg(common.RequestAccountHash, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("sendAccountHash, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -143,7 +143,7 @@ func (self *sender) requestSnapshotHash(height common.HashHeight, prevCnt int) e
 	if err == nil {
 		return errors.New("sendSnapshotHash, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.RequestSnapshotHash, bytM)
+	msg := p2p.NewMsg(common.RequestSnapshotHash, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("sendSnapshotHash, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -162,7 +162,7 @@ func (self *sender) requestAccountBlocks(address string, hashes []common.HashHei
 	if err == nil {
 		return errors.New("requestAccountBlocks, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.RequestAccountBlocks, bytM)
+	msg := p2p.NewMsg(common.RequestAccountBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("requestAccountBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
@@ -180,7 +180,7 @@ func (self *sender) requestSnapshotBlocks(hashes []common.HashHeight) error {
 	if err == nil {
 		return errors.New("requestSnapshotBlocks, format fail. err:" + err.Error())
 	}
-	msg := p2p.NewMsg(p2p.RequestSnapshotBlocks, bytM)
+	msg := p2p.NewMsg(common.RequestSnapshotBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("requestSnapshotBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
