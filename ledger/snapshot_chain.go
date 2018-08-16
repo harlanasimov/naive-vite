@@ -1,10 +1,10 @@
 package ledger
 
 import (
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/ledger/pool"
-	"time"
 )
 
 // snapshot block chain
@@ -12,7 +12,6 @@ type Snapshotchain struct {
 	head             *common.SnapshotBlock
 	snapshotDB       map[string]*common.SnapshotBlock
 	snapshotHeightDB map[int]*common.SnapshotBlock
-	pending          *pool.SnapshotPool
 }
 
 func GetGenesisSnapshot() *common.SnapshotBlock {

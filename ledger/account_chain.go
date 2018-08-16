@@ -2,13 +2,13 @@ package ledger
 
 import (
 	"errors"
+	"strconv"
+	"time"
+
 	"github.com/golang-collections/collections/stack"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/tools"
-	"strconv"
-	"time"
 )
 
 // account block chain
@@ -17,7 +17,6 @@ type AccountChain struct {
 	head            *common.AccountStateBlock
 	accountDB       map[string]*common.AccountStateBlock
 	accountHeightDB map[int]*common.AccountStateBlock
-	pending         *pool.AccountPool
 
 	reqPool       *reqPool
 	snapshotPoint *stack.Stack
@@ -40,10 +39,6 @@ func NewAccountChain(address string, reqPool *reqPool, snapshotHeight int, snaps
 
 	self.snapshotPoint = stack.New()
 	return self
-}
-
-func (self *AccountChain) SetPending(pool *pool.AccountPool) {
-	self.pending = pool
 }
 
 func (self *AccountChain) Head() common.Block {
