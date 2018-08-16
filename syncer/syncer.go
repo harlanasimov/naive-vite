@@ -15,6 +15,12 @@ type Syncer interface {
 	Sender() Sender
 	Handlers() Handlers
 }
+type snapshotChainReader interface {
+	getBlocksByHeightHash(hashH common.HashHeight) *common.SnapshotBlock
+}
+type accountChainReader interface {
+	getBlocksByHeightHash(address string, hashH common.HashHeight) *common.AccountStateBlock
+}
 
 type Fetcher interface {
 	FetchAccount(address string, hash common.HashHeight, prevCnt int)
