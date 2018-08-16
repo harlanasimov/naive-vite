@@ -194,6 +194,7 @@ func NewAccountBlock(
 type NetMsgType int
 
 const (
+	State                 NetMsgType = 101
 	RequestAccountHash    NetMsgType = 102
 	RequestSnapshotHash   NetMsgType = 103
 	RequestAccountBlocks  NetMsgType = 104

@@ -14,7 +14,7 @@ type sender struct {
 }
 
 func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.AccountStateBlock) error {
-	bytM, err := json.Marshal(&accountBlocksMsg{address: address, blocks: blocks})
+	bytM, err := json.Marshal(&accountBlocksMsg{Address: address, blocks: blocks})
 	msg := p2p.NewMsg(common.AccountBlocks, bytM)
 
 	if err == nil {
@@ -37,7 +37,7 @@ func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.Acco
 }
 
 func (self *sender) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) error {
-	bytM, err := json.Marshal(&snapshotBlocksMsg{blocks: blocks})
+	bytM, err := json.Marshal(&snapshotBlocksMsg{Blocks: blocks})
 	msg := p2p.NewMsg(common.SnapshotBlocks, bytM)
 
 	if err == nil {
@@ -60,7 +60,7 @@ func (self *sender) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) erro
 }
 
 func (self *sender) SendAccountBlocks(address string, blocks []*common.AccountStateBlock, peer p2p.Peer) error {
-	bytM, err := json.Marshal(&accountBlocksMsg{address: address, blocks: blocks})
+	bytM, err := json.Marshal(&accountBlocksMsg{Address: address, blocks: blocks})
 	if err == nil {
 		return errors.New("SendAccountBlocks, format fail. err:" + err.Error())
 	}
@@ -73,7 +73,7 @@ func (self *sender) SendAccountBlocks(address string, blocks []*common.AccountSt
 }
 
 func (self *sender) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer p2p.Peer) error {
-	bytM, err := json.Marshal(&snapshotBlocksMsg{blocks: blocks})
+	bytM, err := json.Marshal(&snapshotBlocksMsg{Blocks: blocks})
 	if err == nil {
 		return errors.New("SendSnapshotBlocks, format fail. err:" + err.Error())
 	}
@@ -87,7 +87,7 @@ func (self *sender) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer p2p.
 }
 
 func (self *sender) sendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
-	bytM, err := json.Marshal(&accountHashesMsg{address: address, hashes: hashes})
+	bytM, err := json.Marshal(&accountHashesMsg{Address: address, Hashes: hashes})
 	if err == nil {
 		return errors.New("sendAccountHashes, format fail. err:" + err.Error())
 	}
@@ -100,7 +100,7 @@ func (self *sender) sendAccountHashes(address string, hashes []common.HashHeight
 }
 
 func (self *sender) sendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
-	bytM, err := json.Marshal(&snapshotHashesMsg{hashes: hashes})
+	bytM, err := json.Marshal(&snapshotHashesMsg{Hashes: hashes})
 	if err == nil {
 		return errors.New("sendSnapshotHashes, format fail. err:" + err.Error())
 	}
@@ -119,7 +119,7 @@ func (self *sender) requestAccountHash(address string, height common.HashHeight,
 		log.Error("sendAccountHash, can't get best peer. err:%v", e)
 		return e
 	}
-	m := requestAccountHashMsg{address: address, height: height.Height, hash: height.Hash, prevCnt: prevCnt}
+	m := requestAccountHashMsg{Address: address, Height: height.Height, Hash: height.Hash, PrevCnt: prevCnt}
 	bytM, err := json.Marshal(&m)
 	if err != nil {
 		return errors.New("sendAccountHash, format fail. err:" + err.Error())
@@ -138,7 +138,7 @@ func (self *sender) requestSnapshotHash(height common.HashHeight, prevCnt int) e
 		log.Error("sendSnapshotHash, can't get best peer. err:%v", e)
 		return e
 	}
-	m := requestSnapshotHashMsg{height: height.Height, hash: height.Hash, prevCnt: prevCnt}
+	m := requestSnapshotHashMsg{Height: height.Height, Hash: height.Hash, PrevCnt: prevCnt}
 	bytM, err := json.Marshal(&m)
 	if err == nil {
 		return errors.New("sendSnapshotHash, format fail. err:" + err.Error())
@@ -157,7 +157,7 @@ func (self *sender) requestAccountBlocks(address string, hashes []common.HashHei
 		log.Error("requestAccountBlocks, can't get best peer. err:%v", e)
 		return e
 	}
-	m := requestAccountBlockMsg{address: address, hashes: hashes}
+	m := requestAccountBlockMsg{Address: address, Hashes: hashes}
 	bytM, err := json.Marshal(&m)
 	if err == nil {
 		return errors.New("requestAccountBlocks, format fail. err:" + err.Error())
@@ -175,7 +175,7 @@ func (self *sender) requestSnapshotBlocks(hashes []common.HashHeight) error {
 		log.Error("requestSnapshotBlocks, can't get best peer. err:%v", e)
 		return e
 	}
-	m := requestSnapshotBlockMsg{hashes: hashes}
+	m := requestSnapshotBlockMsg{Hashes: hashes}
 	bytM, err := json.Marshal(&m)
 	if err == nil {
 		return errors.New("requestSnapshotBlocks, format fail. err:" + err.Error())

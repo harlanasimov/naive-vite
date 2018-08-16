@@ -30,6 +30,30 @@ func NewReceiver(fetcher *fetcher) *receiver {
 	return self
 }
 
+type stateHandler struct {
+}
+
+func (self *stateHandler) Id() string {
+	return "default-state-handler"
+}
+
+func (self *stateHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
+	stateMsg := &stateMsg{}
+
+	err := json.Unmarshal(msg, stateMsg)
+	if err != nil {
+		log.Error("stateHandler.Handle unmarshal fail.")
+		return
+	}
+	prevState := peer.GetState()
+	if prevState == nil {
+		peer.SetState(&peerState{height: stateMsg.Height})
+	} else {
+		state := prevState.(*peerState)
+		state.height = stateMsg.Height
+	}
+}
+
 type snapshotHashHandler struct {
 	fetcher *fetcher
 }
@@ -45,7 +69,7 @@ func (self *snapshotHashHandler) Handle(t common.NetMsgType, msg []byte, peer p2
 	if err != nil {
 		log.Error("snapshotHashHandler.Handle unmarshal fail.")
 	}
-	self.fetcher.fetchSnapshotBlockByHash(hashesMsg.hashes)
+	self.fetcher.fetchSnapshotBlockByHash(hashesMsg.Hashes)
 }
 
 type accountHashHandler struct {
@@ -58,7 +82,7 @@ func (self *accountHashHandler) Handle(t common.NetMsgType, msg []byte, peer p2p
 	if err != nil {
 		log.Error("accountHashHandler.Handle unmarshal fail.")
 	}
-	self.fetcher.fetchAccountBlockByHash(hashesMsg.address, hashesMsg.hashes)
+	self.fetcher.fetchAccountBlockByHash(hashesMsg.Address, hashesMsg.Hashes)
 }
 func (self *accountHashHandler) Id() string {
 	return "default-accountHashHandler"
@@ -74,7 +98,7 @@ func (self *snapshotBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer 
 	if err != nil {
 		log.Error("snapshotBlocksHandler.Handle unmarshal fail.")
 	}
-	for _, v := range hashesMsg.blocks {
+	for _, v := range hashesMsg.Blocks {
 		self.fetcher.done(v.Hash(), v.Height())
 	}
 }
@@ -112,6 +136,7 @@ func (self *receiver) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
 		handler.Handle(t, msg, peer)
 	}
 }
+
 func (self *receiver) RegisterHandler(t common.NetMsgType, handler MsgHandler) {
 	self.handlers[t] = handler
 	log.Info("register msg handler, type:%s, handler:%s", t, handler.Id())

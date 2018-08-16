@@ -25,6 +25,17 @@ type peer struct {
 	conn        *websocket.Conn
 	remoteAddr  net.Addr
 	loopWg      sync.WaitGroup
+	state       interface{}
+}
+
+func (self *peer) SetState(s interface{}) {
+	self.state = s
+}
+func (self *peer) GetState() interface{} {
+	if self.state == nil {
+		return nil
+	}
+	return self.state
 }
 
 func (self *peer) Write(msg *Msg) error {

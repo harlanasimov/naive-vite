@@ -2,40 +2,48 @@ package syncer
 
 import "github.com/viteshan/naive-vite/common"
 
+type stateMsg struct {
+	Height int
+}
+
 type accountBlocksMsg struct {
-	address string
+	Address string
 	blocks  []*common.AccountStateBlock
 }
 type snapshotBlocksMsg struct {
-	blocks []*common.SnapshotBlock
+	Blocks []*common.SnapshotBlock
 }
 
 type accountHashesMsg struct {
-	address string
-	hashes  []common.HashHeight
+	Address string
+	Hashes  []common.HashHeight
 }
 type snapshotHashesMsg struct {
-	hashes []common.HashHeight
+	Hashes []common.HashHeight
 }
 
 type requestAccountHashMsg struct {
-	address string
-	height  int
-	hash    string
-	prevCnt int
+	Address string
+	Height  int
+	Hash    string
+	PrevCnt int
 }
 
 type requestSnapshotHashMsg struct {
-	height  int
-	hash    string
-	prevCnt int
+	Height  int
+	Hash    string
+	PrevCnt int
 }
 
 type requestAccountBlockMsg struct {
-	address string
-	hashes  []common.HashHeight
+	Address string
+	Hashes  []common.HashHeight
 }
 
 type requestSnapshotBlockMsg struct {
-	hashes []common.HashHeight
+	Hashes []common.HashHeight
+}
+
+type peerState struct {
+	height int
 }

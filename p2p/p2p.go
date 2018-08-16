@@ -17,6 +17,8 @@ import (
 type Peer interface {
 	Write(msg *Msg) error
 	Id() string
+	SetState(interface{})
+	GetState() interface{}
 }
 
 type Msg struct {
