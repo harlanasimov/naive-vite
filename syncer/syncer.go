@@ -14,6 +14,7 @@ type Syncer interface {
 	Fetcher() Fetcher
 	Sender() Sender
 	Handlers() Handlers
+	DefaultHandler() MsgHandler
 }
 type snapshotChainReader interface {
 	getBlocksByHeightHash(hashH common.HashHeight) *common.SnapshotBlock
@@ -46,12 +47,13 @@ type Sender interface {
 }
 type MsgHandler interface {
 	Handle(common.NetMsgType, []byte, p2p.Peer)
+	Types() []common.NetMsgType
 	Id() string
 }
 
 type Handlers interface {
-	RegisterHandler(common.NetMsgType, MsgHandler)
-	UnRegisterHandler(common.NetMsgType, MsgHandler)
+	RegisterHandler(MsgHandler)
+	UnRegisterHandler(MsgHandler)
 }
 
 type syncer struct {
@@ -60,11 +62,15 @@ type syncer struct {
 	receiver *receiver
 }
 
-func NewSyncer(net p2p.P2P) Syncer {
+func (self *syncer) DefaultHandler() MsgHandler {
+	return self.receiver
+}
+
+func NewSyncer(net p2p.P2P, aReader accountChainReader, sReader snapshotChainReader) Syncer {
 	self := &syncer{}
 	self.sender = &sender{net: net}
 	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
-	self.receiver = NewReceiver(self.fetcher)
+	self.receiver = NewReceiver(self.fetcher, aReader, sReader, self.sender)
 	return self
 }
 

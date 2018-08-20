@@ -8,7 +8,7 @@ type stateMsg struct {
 
 type accountBlocksMsg struct {
 	Address string
-	blocks  []*common.AccountStateBlock
+	Blocks  []*common.AccountStateBlock
 }
 type snapshotBlocksMsg struct {
 	Blocks []*common.SnapshotBlock
@@ -45,5 +45,5 @@ type requestSnapshotBlockMsg struct {
 }
 
 type peerState struct {
-	height int
+	Height int
 }

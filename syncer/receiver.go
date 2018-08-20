@@ -10,27 +10,53 @@ import (
 
 type receiver struct {
 	fetcher       *fetcher
-	innerHandlers map[common.NetMsgType]MsgHandler
-	handlers      map[common.NetMsgType]MsgHandler
+	innerHandlers map[common.NetMsgType][]MsgHandler
+	handlers      map[common.NetMsgType]map[string]MsgHandler
 }
 
-func NewReceiver(fetcher *fetcher) *receiver {
+func (self *receiver) Types() []common.NetMsgType {
+	return nil
+}
+
+func (self *receiver) Id() string {
+	return "default-handler"
+}
+
+func NewReceiver(fetcher *fetcher, aReader accountChainReader, sReader snapshotChainReader, sender Sender) *receiver {
 	self := &receiver{}
 	self.fetcher = fetcher
-	self.innerHandlers = make(map[common.NetMsgType]MsgHandler)
-	snapshotHashHandler := &snapshotHashHandler{fetcher: fetcher}
-	accountHashHandler := &accountHashHandler{fetcher: fetcher}
-	snapshotBlocksHandler := &snapshotBlocksHandler{fetcher: fetcher}
-	accountBlocksHandler := &accountBlocksHandler{fetcher: fetcher}
-	self.innerHandlers[common.AccountHashes] = accountHashHandler
-	self.innerHandlers[common.SnapshotHashes] = snapshotHashHandler
-	self.innerHandlers[common.SnapshotBlocks] = snapshotBlocksHandler
-	self.innerHandlers[common.AccountBlocks] = accountBlocksHandler
-	self.handlers = make(map[common.NetMsgType]MsgHandler)
+	tmpInnerHandlers := make(map[common.NetMsgType][]MsgHandler)
+	var innerhandlers []MsgHandler
+
+	innerhandlers = append(innerhandlers, &accountHashHandler{fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &snapshotHashHandler{fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &snapshotBlocksHandler{fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &accountBlocksHandler{fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &stateHandler{})
+	innerhandlers = append(innerhandlers, &reqAccountHashHandler{aReader: aReader, sender: sender})
+	innerhandlers = append(innerhandlers, &reqSnapshotHashHandler{sReader: sReader, sender: sender})
+	innerhandlers = append(innerhandlers, &reqAccountBlocksHandler{aReader: aReader, sender: sender})
+	innerhandlers = append(innerhandlers, &reqSnapshotBlocksHandler{sReader: sReader, sender: sender})
+
+	for _, h := range innerhandlers {
+		for _, t := range h.Types() {
+			hs := tmpInnerHandlers[t]
+			hs = append(hs, h)
+			tmpInnerHandlers[t] = hs
+		}
+	}
+
+	self.innerHandlers = tmpInnerHandlers
+	self.handlers = make(map[common.NetMsgType]map[string]MsgHandler)
 	return self
 }
 
 type stateHandler struct {
+	MsgHandler
+}
+
+func (self *stateHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.State}
 }
 
 func (self *stateHandler) Id() string {
@@ -47,15 +73,20 @@ func (self *stateHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer)
 	}
 	prevState := peer.GetState()
 	if prevState == nil {
-		peer.SetState(&peerState{height: stateMsg.Height})
+		peer.SetState(&peerState{Height: stateMsg.Height})
 	} else {
 		state := prevState.(*peerState)
-		state.height = stateMsg.Height
+		state.Height = stateMsg.Height
 	}
 }
 
 type snapshotHashHandler struct {
+	MsgHandler
 	fetcher *fetcher
+}
+
+func (self *snapshotHashHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.SnapshotHashes}
 }
 
 func (self *snapshotHashHandler) Id() string {
@@ -73,7 +104,12 @@ func (self *snapshotHashHandler) Handle(t common.NetMsgType, msg []byte, peer p2
 }
 
 type accountHashHandler struct {
+	MsgHandler
 	fetcher *fetcher
+}
+
+func (self *accountHashHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.AccountHashes}
 }
 
 func (self *accountHashHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
@@ -89,7 +125,12 @@ func (self *accountHashHandler) Id() string {
 }
 
 type snapshotBlocksHandler struct {
+	MsgHandler
 	fetcher *fetcher
+}
+
+func (self *snapshotBlocksHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.SnapshotBlocks}
 }
 
 func (self *snapshotBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
@@ -107,7 +148,12 @@ func (self *snapshotBlocksHandler) Id() string {
 }
 
 type accountBlocksHandler struct {
+	MsgHandler
 	fetcher *fetcher
+}
+
+func (self *accountBlocksHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.AccountBlocks}
 }
 
 func (self *accountBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
@@ -116,7 +162,7 @@ func (self *accountBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p
 	if err != nil {
 		log.Error("accountBlocksHandler.Handle unmarshal fail.")
 	}
-	for _, v := range hashesMsg.blocks {
+	for _, v := range hashesMsg.Blocks {
 		self.fetcher.done(v.Hash(), v.Height())
 	}
 }
@@ -126,23 +172,51 @@ func (self *accountBlocksHandler) Id() string {
 }
 
 func (self *receiver) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
-	handler := self.innerHandlers[t]
-	if handler != nil {
-		handler.Handle(t, msg, peer)
-	}
+	self.innerHandle(t, msg, peer, self.innerHandlers)
+	self.handle(t, msg, peer, self.handlers)
+}
+func (self *receiver) innerHandle(t common.NetMsgType, msg []byte, peer p2p.Peer, handlers map[common.NetMsgType][]MsgHandler) {
+	hs := handlers[t]
 
-	handler = self.handlers[t]
-	if handler != nil {
-		handler.Handle(t, msg, peer)
+	if hs != nil {
+		for _, h := range hs {
+			h.Handle(t, msg, peer)
+		}
 	}
 }
 
-func (self *receiver) RegisterHandler(t common.NetMsgType, handler MsgHandler) {
-	self.handlers[t] = handler
-	log.Info("register msg handler, type:%s, handler:%s", t, handler.Id())
+func (self *receiver) handle(t common.NetMsgType, msg []byte, peer p2p.Peer, handlers map[common.NetMsgType]map[string]MsgHandler) {
+	hs := handlers[t]
+	if hs != nil {
+		for _, h := range hs {
+			h.Handle(t, msg, peer)
+		}
+	}
 }
 
-func (self *receiver) UnRegisterHandler(t common.NetMsgType, handler MsgHandler) {
-	delete(self.handlers, t)
-	log.Info("unregister msg handler, type:%s, handler:%s", t, handler.Id())
+func (self *receiver) RegisterHandler(handler MsgHandler) {
+	self.append(self.handlers, handler)
+	log.Info("register msg handler, type:%v, handler:%s", handler.Types(), handler.Id())
+}
+
+func (self *receiver) UnRegisterHandler(handler MsgHandler) {
+	self.delete(self.handlers, handler)
+	log.Info("unregister msg handler, type:%v, handler:%s", handler.Types(), handler.Id())
+}
+func (self *receiver) append(hmap map[common.NetMsgType]map[string]MsgHandler, h MsgHandler) {
+	for _, t := range h.Types() {
+		hs := hmap[t]
+		if hs == nil {
+			hs = make(map[string]MsgHandler)
+			hmap[t] = hs
+		}
+		hs[h.Id()] = h
+	}
+}
+
+func (self *receiver) delete(hmap map[common.NetMsgType]map[string]MsgHandler, h MsgHandler) {
+	for _, t := range h.Types() {
+		hs := hmap[t]
+		delete(hs, h.Id())
+	}
 }

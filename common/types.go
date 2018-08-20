@@ -66,16 +66,36 @@ const (
 )
 
 var txStr map[BlockType]string
+var netMsgTypeStr map[NetMsgType]string
 
 func init() {
 	txStr = map[BlockType]string{
 		SEND:     "send tx",
 		RECEIVED: "received tx",
 	}
+
+	netMsgTypeStr = map[NetMsgType]string{
+		State:                 "State",
+		RequestAccountHash:    "RequestAccountHash",
+		RequestSnapshotHash:   "RequestSnapshotHash",
+		RequestAccountBlocks:  "RequestAccountBlocks",
+		RequestSnapshotBlocks: "RequestSnapshotBlocks",
+		AccountHashes:         "AccountHashes",
+		SnapshotHashes:        "SnapshotHashes",
+		AccountBlocks:         "AccountBlocks",
+		SnapshotBlocks:        "SnapshotBlocks",
+	}
 }
 
 func (self BlockType) String() string {
 	if s, ok := txStr[self]; ok {
+		return s
+	}
+	return "Unknown"
+}
+
+func (self NetMsgType) String() string {
+	if s, ok := netMsgTypeStr[self]; ok {
 		return s
 	}
 	return "Unknown"

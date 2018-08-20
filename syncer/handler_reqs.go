@@ -9,8 +9,13 @@ import (
 )
 
 type reqAccountHashHandler struct {
+	MsgHandler
 	aReader accountChainReader
 	sender  Sender
+}
+
+func (self *reqAccountHashHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.RequestAccountHash}
 }
 
 func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.Peer) {
@@ -43,8 +48,13 @@ func (self *reqAccountHashHandler) Id() string {
 }
 
 type reqSnapshotHashHandler struct {
+	MsgHandler
 	sReader snapshotChainReader
 	sender  Sender
+}
+
+func (self *reqSnapshotHashHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.RequestSnapshotHash}
 }
 
 func (self *reqSnapshotHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.Peer) {
@@ -78,8 +88,13 @@ func (self *reqSnapshotHashHandler) Id() string {
 }
 
 type reqAccountBlocksHandler struct {
+	MsgHandler
 	aReader accountChainReader
 	sender  Sender
+}
+
+func (self *reqAccountBlocksHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.RequestAccountBlocks}
 }
 
 func (self *reqAccountBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2p.Peer) {
@@ -111,8 +126,13 @@ func (*reqAccountBlocksHandler) Id() string {
 }
 
 type reqSnapshotBlocksHandler struct {
+	MsgHandler
 	sReader snapshotChainReader
 	sender  Sender
+}
+
+func (self *reqSnapshotBlocksHandler) Types() []common.NetMsgType {
+	return []common.NetMsgType{common.RequestSnapshotBlocks}
 }
 
 func (self *reqSnapshotBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2p.Peer) {
