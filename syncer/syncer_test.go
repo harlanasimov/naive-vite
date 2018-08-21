@@ -38,6 +38,18 @@ type TestP2P struct {
 	bestPeer *TestPeer
 }
 
+func (self *TestP2P) Start() {
+	panic("implement me")
+}
+
+func (self *TestP2P) Stop() {
+	panic("implement me")
+}
+
+func (self *TestP2P) Id() string {
+	panic("implement me")
+}
+
 func (self *TestP2P) SetHandlerFn(fn p2p.MsgHandle) {
 	self.bestPeer.fn = fn
 }
@@ -53,16 +65,16 @@ func (self *TestP2P) AllPeer() ([]p2p.Peer, error) {
 type TestAccountReader struct {
 }
 
-func (self *TestAccountReader) getBlocksByHeightHash(address string, hashH common.HashHeight) *common.AccountStateBlock {
-	log.Info("TestAccountReader#getBlocksByHeightHash, address:%s, hash:%s, height:%d", address, hashH.Hash, hashH.Height)
+func (self *TestAccountReader) GetAccountBlocksByHashH(address string, hashH common.HashHeight) *common.AccountStateBlock {
+	log.Info("TestAccountReader#GetAccountBlocksByHashH, address:%s, hash:%s, height:%d", address, hashH.Hash, hashH.Height)
 	return genAccountBlock(address, hashH)
 }
 
 type TestSnapshotReader struct {
 }
 
-func (self *TestSnapshotReader) getBlocksByHeightHash(hashH common.HashHeight) *common.SnapshotBlock {
-	log.Info("TestSnapshotReader#getBlocksByHeightHash, hash:%s, height:%d", hashH.Hash, hashH.Height)
+func (self *TestSnapshotReader) GetSnapshotBlocksByHashH(hashH common.HashHeight) *common.SnapshotBlock {
+	log.Info("TestSnapshotReader#GetSnapshotBlocksByHashH, hash:%s, height:%d", hashH.Hash, hashH.Height)
 	return genSnapshotBlock(hashH)
 }
 
@@ -72,7 +84,8 @@ func TestSyncer(t *testing.T) {
 	snapshotReader := &TestSnapshotReader{}
 	accountReader := &TestAccountReader{}
 	p.bestPeer = peer
-	syncer := NewSyncer(p, accountReader, snapshotReader)
+	syncer := NewSyncer(p)
+	syncer.Init(accountReader, snapshotReader)
 	fetcher := syncer.Fetcher()
 	address := "viteshan"
 	testHandler := &TestHandler{}

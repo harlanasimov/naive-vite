@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
 type reqAccountHashHandler struct {
 	MsgHandler
-	aReader accountChainReader
+	aReader face.AccountChainReader
 	sender  Sender
 }
 
@@ -29,7 +30,7 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 	hashH := common.HashHeight{Hash: msg.Hash, Height: msg.Height}
 
 	for i := msg.PrevCnt; i > 0; i-- {
-		block := self.aReader.getBlocksByHeightHash(msg.Address, hashH)
+		block := self.aReader.GetAccountBlocksByHashH(msg.Address, hashH)
 		if block == nil {
 			break
 		}
@@ -49,7 +50,7 @@ func (self *reqAccountHashHandler) Id() string {
 
 type reqSnapshotHashHandler struct {
 	MsgHandler
-	sReader snapshotChainReader
+	sReader face.SnapshotChainReader
 	sender  Sender
 }
 
@@ -69,7 +70,7 @@ func (self *reqSnapshotHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.
 	hashH := common.HashHeight{Hash: msg.Hash, Height: msg.Height}
 
 	for i := msg.PrevCnt; i > 0; i-- {
-		block := self.sReader.getBlocksByHeightHash(hashH)
+		block := self.sReader.GetSnapshotBlocksByHashH(hashH)
 		if block == nil {
 			break
 		}
@@ -89,7 +90,7 @@ func (self *reqSnapshotHashHandler) Id() string {
 
 type reqAccountBlocksHandler struct {
 	MsgHandler
-	aReader accountChainReader
+	aReader face.AccountChainReader
 	sender  Sender
 }
 
@@ -110,7 +111,7 @@ func (self *reqAccountBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2p
 	}
 	var blocks []*common.AccountStateBlock
 	for _, v := range hashes {
-		block := self.aReader.getBlocksByHeightHash(msg.Address, v)
+		block := self.aReader.GetAccountBlocksByHashH(msg.Address, v)
 		if block == nil {
 			continue
 		}
@@ -127,7 +128,7 @@ func (*reqAccountBlocksHandler) Id() string {
 
 type reqSnapshotBlocksHandler struct {
 	MsgHandler
-	sReader snapshotChainReader
+	sReader face.SnapshotChainReader
 	sender  Sender
 }
 
@@ -148,7 +149,7 @@ func (self *reqSnapshotBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2
 	}
 	var blocks []*common.SnapshotBlock
 	for _, v := range hashes {
-		block := self.sReader.getBlocksByHeightHash(v)
+		block := self.sReader.GetSnapshotBlocksByHashH(v)
 		if block == nil {
 			continue
 		}

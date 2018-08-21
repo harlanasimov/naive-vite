@@ -57,6 +57,18 @@ func (self *Snapshotchain) GetBlock(height int) common.Block {
 	return block
 }
 
+func (self *Snapshotchain) GetBlockByHashH(hashH common.HashHeight) *common.SnapshotBlock {
+	if hashH.Height < 0 {
+		log.Error("can't request height 0 block.[snapshotChain]")
+		return nil
+	}
+	block, ok := self.snapshotHeightDB[hashH.Height]
+	if ok && hashH.Hash == block.Hash() {
+		return block
+	}
+	return nil
+}
+
 func (self *Snapshotchain) insertChain(b common.Block, forkVersion int) error {
 	log.Info("insert to snapshot Chain: %v", b)
 	block := b.(*common.SnapshotBlock)

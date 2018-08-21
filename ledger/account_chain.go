@@ -59,7 +59,19 @@ func (self *AccountChain) GetBlock(height int) common.Block {
 	}
 	return nil
 }
-func (self *AccountChain) GetBlockByHash(hash string) common.Block {
+
+func (self *AccountChain) GetBlockByHashH(hashH common.HashHeight) *common.AccountStateBlock {
+	if hashH.Height < 0 {
+		log.Error("can't request height 0 block. account:%s", self.address)
+		return nil
+	}
+	block, ok := self.accountHeightDB[hashH.Height]
+	if ok && block.Hash() == hashH.Hash {
+		return block
+	}
+	return nil
+}
+func (self *AccountChain) GetBlockByHash(hash string) *common.AccountStateBlock {
 	block, ok := self.accountDB[hash]
 	if !ok {
 		return nil

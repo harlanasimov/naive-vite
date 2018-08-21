@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
@@ -15,13 +16,15 @@ type Syncer interface {
 	Sender() Sender
 	Handlers() Handlers
 	DefaultHandler() MsgHandler
+	Init(face.AccountChainReader, face.SnapshotChainReader)
 }
-type snapshotChainReader interface {
-	getBlocksByHeightHash(hashH common.HashHeight) *common.SnapshotBlock
-}
-type accountChainReader interface {
-	getBlocksByHeightHash(address string, hashH common.HashHeight) *common.AccountStateBlock
-}
+
+//type snapshotChainReader interface {
+//	getBlocksByHeightHash(hashH common.HashHeight) *common.SnapshotBlock
+//}
+//type accountChainReader interface {
+//	getBlocksByHeightHash(address string, hashH common.HashHeight) *common.AccountStateBlock
+//}
 
 type Fetcher interface {
 	FetchAccount(address string, hash common.HashHeight, prevCnt int)
@@ -66,12 +69,14 @@ func (self *syncer) DefaultHandler() MsgHandler {
 	return self.receiver
 }
 
-func NewSyncer(net p2p.P2P, aReader accountChainReader, sReader snapshotChainReader) Syncer {
+func NewSyncer(net p2p.P2P) Syncer {
 	self := &syncer{}
 	self.sender = &sender{net: net}
-	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
-	self.receiver = NewReceiver(self.fetcher, aReader, sReader, self.sender)
 	return self
+}
+func (self *syncer) Init(aReader face.AccountChainReader, sReader face.SnapshotChainReader) {
+	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
+	self.receiver = newReceiver(self.fetcher, aReader, sReader, self.sender)
 }
 
 func (self *syncer) Fetcher() Fetcher {

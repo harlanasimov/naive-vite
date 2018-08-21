@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/ledger/pool"
 	"github.com/viteshan/naive-vite/syncer"
@@ -14,6 +15,8 @@ import (
 )
 
 type Ledger interface {
+	face.SnapshotChainReader
+	face.AccountChainReader
 	// from other peer
 	AddSnapshotBlock(block *common.SnapshotBlock)
 	// from self
@@ -44,6 +47,18 @@ type ledger struct {
 	accountVerifier  *verifier.AccountVerifier
 	syncer           syncer.Syncer
 	rwMutex          *sync.RWMutex
+}
+
+func (self *ledger) GetAccountBlocksByHashH(address string, hashH common.HashHeight) *common.AccountStateBlock {
+	ac := self.selfAc(address)
+	if ac == nil || ac.Head() == nil {
+		return nil
+	}
+	return ac.GetBlockByHashH(hashH)
+}
+
+func (self *ledger) GetSnapshotBlocksByHashH(hashH common.HashHeight) *common.SnapshotBlock {
+	return self.sc.GetBlockByHashH(hashH)
 }
 
 func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, error) {
@@ -148,7 +163,7 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 		return errors.New("not exist for account[" + from + "]block[" + reqHash + "]")
 	}
 
-	reqBlock := b.(*common.AccountStateBlock)
+	reqBlock := b
 
 	prev := toAc.Head().(*common.AccountStateBlock)
 	snapshostBlock, _ := self.HeadSnapshost()
@@ -297,41 +312,44 @@ func (self *ledger) UnLockAccounts(startAcs map[string]*common.SnapshotPoint, en
 	}
 	return nil
 }
-func NewLedger(syncer syncer.Syncer) *ledger {
+func NewLedger() *ledger {
 	ledger := &ledger{}
-	ledger.rwMutex = new(sync.RWMutex)
+	return ledger
+}
+
+func (self *ledger) Init(syncer syncer.Syncer) {
+	self.rwMutex = new(sync.RWMutex)
 
 	sc := NewSnapshotChain()
-	ledger.snapshotVerifier = verifier.NewSnapshotVerifier(sc, ledger)
-	ledger.accountVerifier = verifier.NewAccountVerifier(sc, ledger)
-	ledger.syncer = syncer
+	self.snapshotVerifier = verifier.NewSnapshotVerifier(sc, self)
+	self.accountVerifier = verifier.NewAccountVerifier(sc, self)
+	self.syncer = syncer
 
 	snapshotPool := pool.NewSnapshotPool("snapshotPool")
 	snapshotPool.Init(sc.insertChain,
 		sc.removeChain,
-		ledger.snapshotVerifier,
+		self.snapshotVerifier,
 		pool.NewFetcher("", syncer.Fetcher()),
 		sc,
-		ledger.rwMutex,
-		ledger)
-	ledger.reqPool = newReqPool()
+		self.rwMutex,
+		self)
+	self.reqPool = newReqPool()
 
 	acPools := make(map[string]*pool.AccountPool)
 	acs := make(map[string]*AccountChain)
 	accounts := Accounts()
 	for _, account := range accounts {
-		ac := NewAccountChain(account, ledger.reqPool, sc.head.Height(), sc.head.Hash())
+		ac := NewAccountChain(account, self.reqPool, sc.head.Height(), sc.head.Hash())
 		accountPool := pool.NewAccountPool("accountChainPool-" + account)
-		accountPool.Init(ac.insertChain, ac.removeChain, ledger.accountVerifier, pool.NewFetcher(account, syncer.Fetcher()), ac, ledger.rwMutex.RLocker(), ac)
+		accountPool.Init(ac.insertChain, ac.removeChain, self.accountVerifier, pool.NewFetcher(account, syncer.Fetcher()), ac, self.rwMutex.RLocker(), ac)
 		acs[account] = ac
 		acPools[account] = accountPool
 	}
 
-	ledger.ac = acs
-	ledger.sc = sc
-	ledger.pendingAc = acPools
-	ledger.pendingSc = snapshotPool
-	return ledger
+	self.ac = acs
+	self.sc = sc
+	self.pendingAc = acPools
+	self.pendingSc = snapshotPool
 }
 
 func (self *ledger) GetFromChain(account string, hash string) *common.AccountStateBlock {
@@ -339,7 +357,7 @@ func (self *ledger) GetFromChain(account string, hash string) *common.AccountSta
 	if b == nil {
 		return nil
 	}
-	return b.(*common.AccountStateBlock)
+	return b
 }
 func (self *ledger) GetByHFromChain(account string, height int) *common.AccountStateBlock {
 	b := self.selfAc(account).GetBlock(height)
