@@ -14,16 +14,16 @@ import (
 )
 
 func TestBootNode(t *testing.T) {
-	b := bootnode{peers: make(map[int]*peer)}
+	b := bootnode{peers: make(map[string]*peer)}
 	s := "localhost:8000"
 	b.start(s)
 	//c := make(chan int)
 	var last *websocket.Conn
 	for i := 0; i < 10; i++ {
-		conn := cliBootNode(s, i)
+		conn := cliBootNode(s, strconv.Itoa(i))
 		if last != nil {
 			for {
-				contain, e := contain(conn, s, i-1)
+				contain, e := contain(conn, s, strconv.Itoa(i-1))
 				if e != nil {
 					t.Error("error contain %v", strconv.Itoa(i), e)
 					break
@@ -36,7 +36,7 @@ func TestBootNode(t *testing.T) {
 			}
 		}
 		for {
-			contain, e := contain(conn, s, i)
+			contain, e := contain(conn, s, strconv.Itoa(i))
 			if e != nil {
 				t.Error("error contain %v", strconv.Itoa(i), e)
 				break
@@ -54,7 +54,7 @@ func TestBootNode(t *testing.T) {
 	//c <- 90
 }
 
-func cliBootNode(addr string, id int) *websocket.Conn {
+func cliBootNode(addr string, id string) *websocket.Conn {
 	u := url.URL{Scheme: "ws", Host: addr, Path: "/ws"}
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
@@ -64,7 +64,7 @@ func cliBootNode(addr string, id int) *websocket.Conn {
 	return c
 }
 
-func contain(conn *websocket.Conn, targetAddr string, targetId int) (bool, error) {
+func contain(conn *websocket.Conn, targetAddr string, targetId string) (bool, error) {
 	conn.WriteJSON(&bootReq{Tp: 1})
 	log.Info("send request.")
 	_, message, err := conn.ReadMessage()

@@ -14,13 +14,13 @@ func TestServerStart(t *testing.T) {
 
 	startBootNode(bootAddr)
 
-	N := 10
+	N := 2
 	var list []*p2p
 	for i := 0; i < N; i++ {
 		addr := "localhost:808" + strconv.Itoa(i)
 		log.Info(addr)
-		p2p := p2p{id: i, addr: addr, closed: make(chan struct{})}
-		p2p.start(bootAddr)
+		p2p := p2p{id: strconv.Itoa(i), addr: addr, closed: make(chan struct{}), bootAddr: bootAddr}
+		p2p.Start()
 		list = append(list, &p2p)
 	}
 
@@ -32,17 +32,17 @@ func TestServerStart(t *testing.T) {
 		}
 	}
 	for _, v := range list {
-		v.stop()
+		v.Stop()
 	}
 
 }
 func startBootNode(s string) {
-	b := bootnode{peers: make(map[int]*peer)}
+	b := bootnode{peers: make(map[string]*peer)}
 	b.start(s)
 	time.Sleep(time.Second * time.Duration(2))
 }
-func full(self int, peers map[int]*peer, N int) bool {
-	var keys []int
+func full(self string, peers map[string]*peer, N int) bool {
+	var keys []string
 	for k := range peers {
 		keys = append(keys, k)
 	}
@@ -51,10 +51,10 @@ func full(self int, peers map[int]*peer, N int) bool {
 	if len(keys) != N {
 		return false
 	}
-	sort.Ints(keys)
+	sort.Strings(keys)
 
 	for k, v := range keys {
-		if k != v {
+		if strconv.Itoa(k) != v {
 			return false
 		}
 	}
@@ -63,22 +63,22 @@ func full(self int, peers map[int]*peer, N int) bool {
 
 func TestFull(t *testing.T) {
 	N := 10
-	var m = make(map[int]*peer)
+	var m = make(map[string]*peer)
 	for i := 0; i < N; i++ {
 		addr := "localhost:808" + strconv.Itoa(i)
 		log.Info(addr)
-		peer := peer{peerId: i, selfId: -1}
-		m[i] = &peer
+		peer := peer{peerId: strconv.Itoa(i), selfId: strconv.Itoa(-1)}
+		m[strconv.Itoa(i)] = &peer
 	}
-	if full(2, m, N) {
+	if full("2", m, N) {
 		t.Errorf("error not full.")
 	}
-	delete(m, 2)
+	delete(m, "2")
 
-	if !full(2, m, N) {
+	if !full("2", m, N) {
 		t.Errorf("error full.")
 	}
-	if full(3, m, N) {
+	if full("3", m, N) {
 		t.Errorf("error not full")
 	}
 }

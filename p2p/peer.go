@@ -4,8 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"strconv"
-
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
@@ -19,8 +17,8 @@ type closeOnce struct {
 
 type peer struct {
 	closeOnce
-	peerId      int
-	selfId      int
+	peerId      string
+	selfId      string
 	peerSrvAddr string
 	conn        *websocket.Conn
 	remoteAddr  net.Addr
@@ -89,7 +87,7 @@ func (self *peer) stop() {
 	self.loopWg.Wait()
 }
 
-func newPeer(fromId int, toId int, peerSrvAddr string, conn *websocket.Conn) *peer {
+func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Conn) *peer {
 	c := conn.CloseHandler()
 	remoteAddr := conn.RemoteAddr()
 	peer := &peer{peerId: fromId, selfId: toId, peerSrvAddr: peerSrvAddr, conn: conn, remoteAddr: remoteAddr}
@@ -102,5 +100,5 @@ func newPeer(fromId int, toId int, peerSrvAddr string, conn *websocket.Conn) *pe
 }
 
 func (self *peer) info() string {
-	return "[" + strconv.Itoa(self.selfId) + "]-[" + strconv.Itoa(self.peerId) + "]"
+	return "[" + self.selfId + "]-[" + self.peerId + "]"
 }

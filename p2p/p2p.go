@@ -2,15 +2,17 @@ package p2p
 
 import (
 	"net/url"
-	"strconv"
 	"sync"
 	"time"
 
 	"encoding/json"
 
+	"strconv"
+
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 )
 
@@ -43,6 +45,9 @@ type P2P interface {
 	BestPeer() (Peer, error)
 	AllPeer() ([]Peer, error)
 	SetHandlerFn(MsgHandle)
+	Start()
+	Stop()
+	Id() string
 }
 
 type p2p struct {
@@ -51,15 +56,24 @@ type p2p struct {
 	server       *server
 	dial         *dial
 	linker       *linker
-	peers        map[int]*peer
-	pendingDials map[int]string
-	id           int
+	peers        map[string]*peer
+	pendingDials map[string]string
+	id           string
 	addr         string
+	bootAddr     string
 	closed       chan struct{}
 	loopWg       sync.WaitGroup
 	msgHandleFn  MsgHandle
 }
 
+func NewP2P(config config.P2P) P2P {
+	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), bootAddr: config.BootAddr}
+	return p2p
+}
+
+func (self *p2p) Id() string {
+	return self.id
+}
 func (self *p2p) BestPeer() (Peer, error) {
 	if len(self.peers) > 0 {
 		for _, v := range self.peers {
@@ -89,8 +103,9 @@ func (self *p2p) addPeer(peer *peer) {
 	defer self.mu.Unlock()
 	old, ok := self.peers[peer.peerId]
 	if ok && old != peer {
-		log.Warn("peer exist, close old peer: %v", peer.info())
-		old.close()
+		log.Warn("peer exist, close new peer: %v", peer.info())
+		peer.close()
+		return
 	}
 	self.peers[peer.peerId] = peer
 	go self.loopPeer(peer)
@@ -132,22 +147,22 @@ func (self *p2p) loopPeer(peer *peer) {
 	}
 }
 
-func (self *p2p) allPeers() map[int]*peer {
+func (self *p2p) allPeers() map[string]*peer {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	result := make(map[int]*peer, len(self.peers))
+	result := make(map[string]*peer, len(self.peers))
 	for k, v := range self.peers {
 		result[k] = v
 	}
 	return result
 }
 
-func (self *p2p) start(bootAddr string) {
-	self.pendingDials = make(map[int]string)
-	self.peers = make(map[int]*peer)
+func (self *p2p) Start() {
+	self.pendingDials = make(map[string]string)
+	self.peers = make(map[string]*peer)
 	self.dial = &dial{p2p: self}
-	self.server = &server{id: self.id, addr: self.addr, bootAddr: bootAddr, p2p: self}
-	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: bootAddr, Path: "/ws"})
+	self.server = &server{id: self.id, addr: self.addr, bootAddr: self.bootAddr, p2p: self}
+	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: self.bootAddr, Path: "/ws"})
 	self.server.start()
 	self.linker.start()
 	go self.loop()
@@ -164,24 +179,24 @@ func (self *p2p) loop() {
 			for i, v := range self.pendingDials {
 				_, ok := self.peers[i]
 				if !ok {
-					log.Info("node " + strconv.Itoa(self.server.id) + " try to connect to " + strconv.Itoa(i))
+					log.Info("node " + self.server.id + " try to connect to " + i)
 					connectted := self.dial.connect(v)
 					if connectted {
-						log.Info("connect success." + strconv.Itoa(self.server.id) + ":" + strconv.Itoa(i))
+						log.Info("connect success." + self.server.id + ":" + i)
 						delete(self.pendingDials, i)
 					}
 				} else {
-					log.Info("has connected for " + strconv.Itoa(self.server.id) + ":" + strconv.Itoa(i))
+					log.Info("has connected for " + self.server.id + ":" + i)
 				}
 			}
 		case <-self.closed:
-			log.Info("p2p[%d] closed.", self.id)
+			log.Info("p2p[%s] closed.", self.id)
 			return
 		}
 	}
 }
 
-func (self *p2p) stop() {
+func (self *p2p) Stop() {
 	self.linker.stop()
 	for _, v := range self.peers {
 		v.stop()
@@ -189,10 +204,9 @@ func (self *p2p) stop() {
 	self.server.stop()
 	close(self.closed)
 	self.loopWg.Wait()
-
 }
 
-func (self *p2p) addDial(id int, addr string) bool {
+func (self *p2p) addDial(id string, addr string) bool {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	if id == self.id {

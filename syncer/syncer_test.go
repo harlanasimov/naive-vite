@@ -1,11 +1,10 @@
 package syncer
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
-
-	"encoding/json"
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"

@@ -53,7 +53,7 @@ func (self *linker) loopRead(conn *websocket.Conn) {
 			addr := r.Addr
 			yes := self.p2p.addDial(id, addr)
 			if yes {
-				log.Info("recv: add dial success. targetId:%d, selfId:%d", id, self.p2p.id)
+				log.Info("recv: add dial success. targetId:%s, selfId:%s", id, self.p2p.id)
 			}
 		}
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 type server struct {
-	id       int
+	id       string
 	addr     string
 	p2p      *p2p
 	bootAddr string

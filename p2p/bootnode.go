@@ -15,8 +15,8 @@ import (
 )
 
 type bootnode struct {
-	id     int
-	peers  map[int]*peer
+	id     string
+	peers  map[string]*peer
 	mu     sync.Mutex
 	server *http.Server
 }
@@ -140,12 +140,12 @@ func (self bootnode) stop() {
 }
 
 type bootLinkPeer struct {
-	Id   int
+	Id   string
 	Addr string
 }
 
 type bootReq struct {
 	Tp   int
-	Id   int
+	Id   string
 	Addr string
 }

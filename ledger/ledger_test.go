@@ -20,6 +20,10 @@ type TestSyncer struct {
 	f      syncer.Fetcher
 }
 
+func (self *TestSyncer) DefaultHandler() syncer.MsgHandler {
+	panic("implement me")
+}
+
 func NewTestSync() *TestSyncer {
 	testSyncer := &TestSyncer{Blocks: make(map[string]*test.TestBlock)}
 	testSyncer.f = &TestFetcher{}
