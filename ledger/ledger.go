@@ -24,7 +24,8 @@ type Ledger interface {
 	// from other peer
 	AddAccountBlock(account string, block *common.AccountStateBlock) error
 	// from self
-	RequestAccountBlock(address string, block *common.AccountStateBlock) error
+	//RequestAccountBlock(address string, block *common.AccountStateBlock) error
+	RequestAccountBlock(from string, to string, amount int) error
 	ResponseAccountBlock(from string, to string, reqHash string) error
 	// create account genesis block
 	CreateAccount(address string) error
@@ -146,8 +147,14 @@ func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBl
 	return nil
 }
 
-func (self *ledger) RequestAccountBlock(account string, block *common.AccountStateBlock) error {
-	return self.selfPendingAc(account).AddDirectBlock(block)
+func (self *ledger) RequestAccountBlock(from string, to string, amount int) error {
+	headAccount, _ := self.HeadAccount(from)
+	headSnaphost, _ := self.HeadSnapshost()
+
+	newBlock := common.NewAccountBlockFrom(headAccount, from, time.Now(), amount, headSnaphost,
+		common.SEND, from, to, "")
+	newBlock.SetHash(tools.CalculateAccountHash(newBlock))
+	return self.selfPendingAc(from).AddDirectBlock(newBlock)
 }
 func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string) error {
 	fromAc := self.selfAc(from)

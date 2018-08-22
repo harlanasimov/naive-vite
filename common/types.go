@@ -211,6 +211,41 @@ func NewAccountBlock(
 	return block
 }
 
+func NewAccountBlockFrom(
+	accountBlock *AccountStateBlock,
+	signer string,
+	timestamp time.Time,
+
+	modifiedAmount int,
+	snapshotBlock *SnapshotBlock,
+
+	blockType BlockType,
+	from string,
+	to string,
+	sourceHash string,
+) *AccountStateBlock {
+	block := &AccountStateBlock{}
+	if accountBlock == nil {
+		block.Theight = 1
+		block.TpreHash = ""
+		block.Amount = modifiedAmount
+	} else {
+		block.Theight = accountBlock.Height() + 1
+		block.TpreHash = accountBlock.Hash()
+		block.Amount = accountBlock.Amount + modifiedAmount
+	}
+	block.Tsigner = signer
+	block.Ttimestamp = timestamp
+	block.ModifiedAmount = modifiedAmount
+	block.SnapshotHash = snapshotBlock.Hash()
+	block.SnapshotHeight = snapshotBlock.Height()
+	block.BlockType = blockType
+	block.From = from
+	block.To = to
+	block.SourceHash = sourceHash
+	return block
+}
+
 type NetMsgType int
 
 const (

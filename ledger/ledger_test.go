@@ -7,6 +7,7 @@ import (
 
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/miner"
@@ -18,6 +19,10 @@ import (
 type TestSyncer struct {
 	Blocks map[string]*test.TestBlock
 	f      syncer.Fetcher
+}
+
+func (self *TestSyncer) Init(face.AccountChainReader, face.SnapshotChainReader) {
+	panic("implement me")
 }
 
 func (self *TestSyncer) DefaultHandler() syncer.MsgHandler {
@@ -63,7 +68,8 @@ func TestTime(t *testing.T) {
 
 func TestLedger(t *testing.T) {
 	testSyncer := NewTestSync()
-	ledger := NewLedger(testSyncer)
+	ledger := NewLedger()
+	ledger.Init(testSyncer)
 	ledger.Start()
 
 	ledger.AddSnapshotBlock(genSnapshotBlock(ledger))
@@ -75,16 +81,11 @@ func TestLedger(t *testing.T) {
 
 	viteshan1 := "viteshan1"
 	ledger.CreateAccount(viteshan)
-	time.Sleep(2 * time.Second)
-	snapshotBlock, _ := ledger.HeadSnapshost()
-	headAccount, _ := ledger.HeadAccount(viteshan1)
-
+	ledger.CreateAccount(viteshan1)
+	time.Sleep(5 * time.Second)
 	{
-		block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
-			0, -105, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
-		block.SetHash(tools.CalculateAccountHash(block))
 		var err error
-		err = ledger.RequestAccountBlock(viteshan1, block)
+		err = ledger.RequestAccountBlock(viteshan1, viteshan, -105)
 		if err == nil {
 			t.Error("expected error.")
 		} else {
@@ -92,14 +93,9 @@ func TestLedger(t *testing.T) {
 		}
 	}
 	{
-		block := common.NewAccountBlock(1, "", headAccount.Hash(), viteshan1, time.Unix(1533550878, 0),
-			10, -90, snapshotBlock.Height(), snapshotBlock.Hash(), common.SEND, viteshan1, viteshan, "")
-		block.SetHash(tools.CalculateAccountHash(block))
-
-		err := ledger.RequestAccountBlock(viteshan1, block)
+		err := ledger.RequestAccountBlock(viteshan1, viteshan, -90)
 		if err != nil {
 			t.Errorf("expected error.%v", err)
-
 		}
 	}
 	{
@@ -109,14 +105,7 @@ func TestLedger(t *testing.T) {
 		}
 		req := reqs[0]
 
-		headAcc, _ := ledger.HeadAccount(viteshan)
-
-		block := common.NewAccountBlock(1, "", headAcc.Hash(), viteshan, time.Unix(1533550878, 0),
-			190, 90, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, viteshan1, viteshan, req.ReqHash)
-
-		block.SetHash(tools.CalculateAccountHash(block))
-
-		err := ledger.RequestAccountBlock(viteshan, block)
+		err := ledger.ResponseAccountBlock(viteshan1, viteshan, req.ReqHash)
 		if err != nil {
 			t.Errorf("expected error.%v", err)
 		}
@@ -127,7 +116,8 @@ func TestLedger(t *testing.T) {
 
 func TestSnapshotFork(t *testing.T) {
 	testSyncer := NewTestSync()
-	ledger := NewLedger(testSyncer)
+	ledger := NewLedger()
+	ledger.Init(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
 
@@ -169,7 +159,8 @@ func TestSnapshotFork(t *testing.T) {
 
 func TestAccountFork(t *testing.T) {
 	testSyncer := NewTestSync()
-	ledger := NewLedger(testSyncer)
+	ledger := NewLedger()
+	ledger.Init(testSyncer)
 	ledger.Start()
 	time.Sleep(time.Second)
 
@@ -245,7 +236,8 @@ func TestMap(t *testing.T) {
 
 func TestLedger_MiningSnapshotBlock(t *testing.T) {
 	testSyncer := NewTestSync()
-	ledger := NewLedger(testSyncer)
+	ledger := NewLedger()
+	ledger.Init(testSyncer)
 	ledger.Start()
 }
 
@@ -264,7 +256,8 @@ func genCommitee() *consensus.Committee {
 
 func TestNewMiner(t *testing.T) {
 	testSyncer := NewTestSync()
-	ledger := NewLedger(testSyncer)
+	ledger := NewLedger()
+	ledger.Init(testSyncer)
 	ledger.Start()
 
 	committee := genCommitee()

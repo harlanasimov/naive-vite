@@ -2,13 +2,6 @@ package examples
 
 import (
 	"bufio"
-	"github.com/asaskevich/EventBus"
-	"github.com/viteshan/naive-vite/common"
-	"github.com/viteshan/naive-vite/consensus"
-	"github.com/viteshan/naive-vite/ledger"
-	"github.com/viteshan/naive-vite/miner"
-	"github.com/viteshan/naive-vite/syncer"
-	"github.com/viteshan/naive-vite/tools"
 	"io"
 	"log"
 	"net"
@@ -16,6 +9,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/asaskevich/EventBus"
+	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/consensus"
+	"github.com/viteshan/naive-vite/ledger"
+	"github.com/viteshan/naive-vite/miner"
 )
 
 type V0_12 struct {
@@ -200,12 +199,7 @@ func (self *V0_12) sendTx(conn net.Conn, address string) {
 }
 
 func (self *V0_12) submitTx(from string, to string, amount int) {
-	headAccount, _ := self.ledger.HeadAccount(from)
-	headSnaphost, _ := self.ledger.HeadSnapshost()
-	newBlock := common.NewAccountBlock(headAccount.Height()+1, "", headAccount.Hash(), from, time.Now(), headAccount.Amount+amount, amount, headSnaphost.Height(), headSnaphost.Hash(),
-		common.SEND, from, to, "")
-	newBlock.SetHash(tools.CalculateAccountHash(newBlock))
-	err := self.ledger.RequestAccountBlock(from, newBlock)
+	err := self.ledger.RequestAccountBlock(from, to, amount)
 
 	if err == nil {
 		log.Printf("submit send Tx success[" + from + "].\n")
