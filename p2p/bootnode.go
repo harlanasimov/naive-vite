@@ -6,19 +6,33 @@ import (
 	"sync"
 
 	"context"
-	"os"
-	"os/signal"
-
 	"strings"
 
+	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 )
+
+func NewBoot(config config.Boot) Boot {
+	if config.BootAddr == "" {
+		log.Warn("bootAddr is empty.")
+		return nil
+	}
+	b := bootnode{peers: make(map[string]*peer), cfg: config, closed: make(chan struct{})}
+	return &b
+}
 
 type bootnode struct {
 	id     string
 	peers  map[string]*peer
 	mu     sync.Mutex
 	server *http.Server
+	cfg    config.Boot
+	closed chan struct{}
+	wg     sync.WaitGroup
+}
+
+func (self *bootnode) Start() {
+	self.start(self.cfg.BootAddr)
 }
 
 func (self *bootnode) addPeer(peer *peer) {
@@ -44,11 +58,16 @@ func (self *bootnode) removePeer(peer *peer) {
 }
 
 func (self *bootnode) loopread(peer *peer) {
+	defer log.Info("bootnode loopread closed.")
+	self.wg.Add(1)
+	defer self.wg.Done()
 	conn := peer.conn
 	defer peer.close()
 
 	for {
 		select {
+		case <-self.closed:
+			return
 		case <-peer.closed:
 			return
 		default:
@@ -77,24 +96,28 @@ func (self *bootnode) start(addr string) {
 	server := &http.Server{Addr: addr, Handler: mux}
 
 	//idleConnsClosed := make(chan struct{})
+	self.wg.Add(1)
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-		<-sigint
+		<-self.closed
 
 		// We received an interrupt signal, shut down.
 		if err := server.Shutdown(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
 			log.Info("HTTP server Shutdown: %v", err)
 		}
+		defer log.Info("bootnode shutdown await closed.")
+		self.wg.Done()
 		//close(idleConnsClosed)
 	}()
 
+	self.wg.Add(1)
 	go func() {
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			// Error starting or closing listener:
 			log.Info("HTTP server ListenAndServe: %v", err)
 		}
+		defer log.Info("bootnode listening closed.")
+		self.wg.Done()
 	}()
 	self.server = server
 	//<-idleConnsClosed
@@ -131,12 +154,13 @@ func (self *bootnode) allPeer() []*bootLinkPeer {
 	}
 	return results
 }
-func (self bootnode) stop() {
+func (self *bootnode) Stop() {
 	for _, peer := range self.peers {
 		peer.close()
 	}
 	self.server.Shutdown(context.Background())
-
+	close(self.closed)
+	self.wg.Wait()
 }
 
 type bootLinkPeer struct {

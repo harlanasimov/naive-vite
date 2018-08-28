@@ -14,7 +14,7 @@ import (
 )
 
 func TestBootNode(t *testing.T) {
-	b := bootnode{peers: make(map[string]*peer)}
+	b := bootnode{peers: make(map[string]*peer), closed: make(chan struct{})}
 	s := "localhost:8000"
 	b.start(s)
 	//c := make(chan int)
@@ -50,7 +50,7 @@ func TestBootNode(t *testing.T) {
 		last = conn
 		conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
 	}
-	b.stop()
+	b.Stop()
 	//c <- 90
 }
 
