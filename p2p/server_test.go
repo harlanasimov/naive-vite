@@ -19,7 +19,7 @@ func TestServerStart(t *testing.T) {
 	for i := 0; i < N; i++ {
 		addr := "localhost:808" + strconv.Itoa(i)
 		log.Info(addr)
-		p2p := p2p{id: strconv.Itoa(i), addr: addr, closed: make(chan struct{}), bootAddr: bootAddr}
+		p2p := p2p{id: strconv.Itoa(i), addr: addr, closed: make(chan struct{}), linkBootAddr: bootAddr}
 		p2p.Start()
 		list = append(list, &p2p)
 	}

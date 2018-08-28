@@ -50,16 +50,23 @@ type P2P interface {
 	Id() string
 }
 
+type Boot interface {
+	Start()
+	Stop()
+}
+
 type p2p struct {
 	//peers  []*peer
 	mu           sync.Mutex
 	server       *server
 	dial         *dial
 	linker       *linker
+	boot         *bootnode
 	peers        map[string]*peer
 	pendingDials map[string]string
 	id           string
 	addr         string
+	linkBootAddr string
 	bootAddr     string
 	closed       chan struct{}
 	loopWg       sync.WaitGroup
@@ -67,7 +74,7 @@ type p2p struct {
 }
 
 func NewP2P(config config.P2P) P2P {
-	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), bootAddr: config.BootAddr}
+	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr, bootAddr: config.BootAddr}
 	return p2p
 }
 
@@ -161,8 +168,8 @@ func (self *p2p) Start() {
 	self.pendingDials = make(map[string]string)
 	self.peers = make(map[string]*peer)
 	self.dial = &dial{p2p: self}
-	self.server = &server{id: self.id, addr: self.addr, bootAddr: self.bootAddr, p2p: self}
-	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: self.bootAddr, Path: "/ws"})
+	self.server = &server{id: self.id, addr: self.addr, bootAddr: self.linkBootAddr, p2p: self}
+	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: self.linkBootAddr, Path: "/ws"})
 	self.server.start()
 	self.linker.start()
 	go self.loop()

@@ -20,7 +20,7 @@ func TestP2P(t *testing.T) {
 	for i := 0; i < N; i++ {
 		addr := "localhost:808" + strconv.Itoa(i)
 		log.Info(addr)
-		config := config.P2P{NodeId: strconv.Itoa(i), Port: 8080 + i, BootAddr: bootAddr, NetId: 0}
+		config := config.P2P{NodeId: strconv.Itoa(i), Port: 8080 + i, LinkBootAddr: bootAddr, NetId: 0}
 		p2p := NewP2P(config)
 		p2p.Start()
 		list = append(list, p2p)
