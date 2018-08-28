@@ -12,9 +12,11 @@ import (
 
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/ledger"
 	"github.com/viteshan/naive-vite/miner"
+	"github.com/viteshan/naive-vite/syncer"
 )
 
 type V0_12 struct {
@@ -26,14 +28,39 @@ type V0_12 struct {
 type TestSyncer struct {
 }
 
-func (self *TestSyncer) Fetch(hash common.HashHeight, prevCnt int) {
+func (self *TestSyncer) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
+	panic("implement me")
+}
 
+func (self *TestSyncer) FetchSnapshot(hash common.HashHeight, prevCnt int) {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Fetcher() syncer.Fetcher {
+	return self
+}
+
+func (self *TestSyncer) Sender() syncer.Sender {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Handlers() syncer.Handlers {
+	panic("implement me")
+}
+
+func (self *TestSyncer) DefaultHandler() syncer.MsgHandler {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Init(face.AccountChainReader, face.SnapshotChainReader) {
+	panic("implement me")
 }
 func newV0_12() *V0_12 {
 	self := &V0_12{}
 	self.nodes = make(map[string]string)
 	self.chainmutex = &sync.Mutex{}
-	self.ledger = ledger.NewLedger(&TestSyncer{})
+	self.ledger = ledger.NewLedger()
+	self.ledger.Init(&TestSyncer{})
 
 	self.ledger.Start()
 	genesisTime := ledger.GetGenesisSnapshot().Timestamp()
