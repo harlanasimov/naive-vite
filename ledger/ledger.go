@@ -35,6 +35,7 @@ type Ledger interface {
 	ExistAccount(address string) bool
 	ListRequest(address string) []*Req
 	Start()
+	Init(syncer syncer.Syncer)
 }
 
 type ledger struct {
