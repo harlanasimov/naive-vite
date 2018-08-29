@@ -241,7 +241,7 @@ func TestLedger_MiningSnapshotBlock(t *testing.T) {
 	ledger.Start()
 }
 
-func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW) (*miner.Miner, EventBus.Bus) {
+func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW) (miner.Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	miner := miner.NewMiner(rw, bus, coinbase, committee)

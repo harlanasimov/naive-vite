@@ -5,7 +5,6 @@ type P2P struct {
 	Port         int
 	NetId        int
 	LinkBootAddr string
-	BootAddr     string
 }
 
 type Boot struct {

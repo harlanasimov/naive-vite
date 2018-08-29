@@ -113,6 +113,7 @@ func (self *ledger) GetAccountBalance(address string) int {
 }
 
 func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
+	log.Info("snapshot block[%s] add.", block.Hash())
 	self.pendingSc.AddBlock(block)
 }
 
@@ -140,10 +141,12 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 		log.Error("add direct block error. ", err)
 		return err
 	}
+	self.syncer.Sender().BroadcastSnapshotBlocks([]*common.SnapshotBlock{block})
 	return nil
 }
 
 func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) error {
+	log.Info("account[%s] block[%s] add.", block.Signer(), block.Hash())
 	self.selfPendingAc(account).AddBlock(block)
 	return nil
 }

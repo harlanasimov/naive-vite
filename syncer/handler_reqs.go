@@ -11,7 +11,7 @@ import (
 
 type reqAccountHashHandler struct {
 	MsgHandler
-	aReader face.AccountChainReader
+	aReader face.ChainRw
 	sender  Sender
 }
 
@@ -50,7 +50,7 @@ func (self *reqAccountHashHandler) Id() string {
 
 type reqSnapshotHashHandler struct {
 	MsgHandler
-	sReader face.SnapshotChainReader
+	sReader face.ChainRw
 	sender  Sender
 }
 
@@ -90,7 +90,7 @@ func (self *reqSnapshotHashHandler) Id() string {
 
 type reqAccountBlocksHandler struct {
 	MsgHandler
-	aReader face.AccountChainReader
+	aReader face.ChainRw
 	sender  Sender
 }
 
@@ -128,7 +128,7 @@ func (*reqAccountBlocksHandler) Id() string {
 
 type reqSnapshotBlocksHandler struct {
 	MsgHandler
-	sReader face.SnapshotChainReader
+	sReader face.ChainRw
 	sender  Sender
 }
 

@@ -1,9 +1,11 @@
 package consensus
 
 import (
+	"time"
+
 	"github.com/vitelabs/go-vite/common/types"
 	"github.com/viteshan/naive-vite/common"
-	"time"
+	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 )
 
@@ -55,8 +57,8 @@ type SignerFn func(a common.Address, data []byte) (signedData, pubkey []byte, er
 // update committee result
 type Committee struct {
 	types.LifecycleStatus
-	interval     int32
-	memberCnt    int32
+	interval     int
+	memberCnt    int
 	teller       *teller
 	subscribeMem *SubscribeMem
 	signer       common.Address
@@ -95,8 +97,13 @@ func (self *Committee) verifyProducer(header *common.SnapshotBlock) (bool, error
 }
 
 func NewCommittee(genesisTime time.Time, interval int32, memberCnt int32) *Committee {
-	committee := &Committee{interval: interval, memberCnt: memberCnt}
+	committee := &Committee{interval: int(interval), memberCnt: int(memberCnt)}
 	committee.teller = newTeller(genesisTime, interval, memberCnt)
+	return committee
+}
+func NewConsensus(genesisTime time.Time, cfg config.Consensus) Consensus {
+	committee := &Committee{interval: cfg.Interval, memberCnt: cfg.MemCnt}
+	committee.teller = newTeller(genesisTime, int32(cfg.Interval), int32(cfg.MemCnt))
 	return committee
 }
 

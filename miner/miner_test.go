@@ -1,13 +1,14 @@
 package miner
 
 import (
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/ledger"
-	"strconv"
-	"testing"
-	"time"
 )
 
 type SnapshotRW struct {
@@ -19,7 +20,7 @@ func (SnapshotRW) MiningSnapshotBlock(address string, timestamp int64) error {
 	return nil
 }
 
-func genMiner(committee *consensus.Committee) (*Miner, EventBus.Bus) {
+func genMiner(committee *consensus.Committee) (Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}
@@ -27,7 +28,7 @@ func genMiner(committee *consensus.Committee) (*Miner, EventBus.Bus) {
 	return miner, bus
 }
 
-func genMinerAuto(committee *consensus.Committee) (*Miner, EventBus.Bus) {
+func genMinerAuto(committee *consensus.Committee) (Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}

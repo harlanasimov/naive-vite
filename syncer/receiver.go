@@ -23,7 +23,7 @@ func (self *receiver) Id() string {
 	return "default-handler"
 }
 
-func newReceiver(fetcher *fetcher, aReader face.AccountChainReader, sReader face.SnapshotChainReader, sender Sender) *receiver {
+func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender) *receiver {
 	self := &receiver{}
 	self.fetcher = fetcher
 	tmpInnerHandlers := make(map[common.NetMsgType][]MsgHandler)
@@ -31,13 +31,13 @@ func newReceiver(fetcher *fetcher, aReader face.AccountChainReader, sReader face
 
 	innerhandlers = append(innerhandlers, &accountHashHandler{fetcher: fetcher})
 	innerhandlers = append(innerhandlers, &snapshotHashHandler{fetcher: fetcher})
-	innerhandlers = append(innerhandlers, &snapshotBlocksHandler{fetcher: fetcher})
-	innerhandlers = append(innerhandlers, &accountBlocksHandler{fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &snapshotBlocksHandler{sWriter: rw, fetcher: fetcher})
+	innerhandlers = append(innerhandlers, &accountBlocksHandler{aWriter: rw, fetcher: fetcher})
 	innerhandlers = append(innerhandlers, &stateHandler{})
-	innerhandlers = append(innerhandlers, &reqAccountHashHandler{aReader: aReader, sender: sender})
-	innerhandlers = append(innerhandlers, &reqSnapshotHashHandler{sReader: sReader, sender: sender})
-	innerhandlers = append(innerhandlers, &reqAccountBlocksHandler{aReader: aReader, sender: sender})
-	innerhandlers = append(innerhandlers, &reqSnapshotBlocksHandler{sReader: sReader, sender: sender})
+	innerhandlers = append(innerhandlers, &reqAccountHashHandler{aReader: rw, sender: sender})
+	innerhandlers = append(innerhandlers, &reqSnapshotHashHandler{sReader: rw, sender: sender})
+	innerhandlers = append(innerhandlers, &reqAccountBlocksHandler{aReader: rw, sender: sender})
+	innerhandlers = append(innerhandlers, &reqSnapshotBlocksHandler{sReader: rw, sender: sender})
 
 	for _, h := range innerhandlers {
 		for _, t := range h.Types() {
@@ -128,6 +128,7 @@ func (self *accountHashHandler) Id() string {
 type snapshotBlocksHandler struct {
 	MsgHandler
 	fetcher *fetcher
+	sWriter face.ChainRw
 }
 
 func (self *snapshotBlocksHandler) Types() []common.NetMsgType {
@@ -142,6 +143,7 @@ func (self *snapshotBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer 
 	}
 	for _, v := range hashesMsg.Blocks {
 		self.fetcher.done(v.Hash(), v.Height())
+		self.sWriter.AddSnapshotBlock(v)
 	}
 }
 func (self *snapshotBlocksHandler) Id() string {
@@ -151,6 +153,7 @@ func (self *snapshotBlocksHandler) Id() string {
 type accountBlocksHandler struct {
 	MsgHandler
 	fetcher *fetcher
+	aWriter face.ChainRw
 }
 
 func (self *accountBlocksHandler) Types() []common.NetMsgType {
@@ -165,6 +168,7 @@ func (self *accountBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p
 	}
 	for _, v := range hashesMsg.Blocks {
 		self.fetcher.done(v.Hash(), v.Height())
+		self.aWriter.AddAccountBlock(v.Signer(), v)
 	}
 }
 

@@ -26,3 +26,12 @@ type AccountsConsensus interface {
 	SnapshotAccount(block *common.SnapshotBlock, h *common.AccountHashH)
 	UnLockAccounts(startAcs map[string]*common.SnapshotPoint, endAcs map[string]*common.SnapshotPoint) error
 }
+
+type Consensus interface {
+	ConsensusVerifier
+	Seal
+
+	Subscribe(subscribeMem *SubscribeMem)
+	Init()
+	Start()
+}

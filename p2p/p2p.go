@@ -24,19 +24,12 @@ type Peer interface {
 }
 
 type Msg struct {
-	t    common.NetMsgType // type: 2~100 basic msg  101~200:biz msg
-	data []byte
-}
-
-func (self *Msg) Type() common.NetMsgType {
-	return self.t
-}
-func (self *Msg) Data() []byte {
-	return self.data
+	T    common.NetMsgType // type: 2~100 basic msg  101~200:biz msg
+	Data []byte
 }
 
 func NewMsg(t common.NetMsgType, data []byte) *Msg {
-	return &Msg{t: t, data: data}
+	return &Msg{T: t, Data: data}
 }
 
 type MsgHandle func(common.NetMsgType, []byte, Peer)
@@ -67,14 +60,13 @@ type p2p struct {
 	id           string
 	addr         string
 	linkBootAddr string
-	bootAddr     string
 	closed       chan struct{}
 	loopWg       sync.WaitGroup
 	msgHandleFn  MsgHandle
 }
 
 func NewP2P(config config.P2P) P2P {
-	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr, bootAddr: config.BootAddr}
+	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr}
 	return p2p
 }
 
@@ -101,8 +93,8 @@ func (self *p2p) AllPeer() ([]Peer, error) {
 	return nil, errors.New("can't find best peer.")
 }
 
-func (self *p2p) SetHandlerFn(MsgHandle) {
-	panic("implement me")
+func (self *p2p) SetHandlerFn(handler MsgHandle) {
+	self.msgHandleFn = handler
 }
 
 func (self *p2p) addPeer(peer *peer) {
@@ -146,7 +138,7 @@ func (self *p2p) loopPeer(peer *peer) {
 					continue
 				}
 				if self.msgHandleFn != nil {
-					self.msgHandleFn(msg.t, msg.data, peer)
+					self.msgHandleFn(msg.T, msg.Data, peer)
 				}
 			}
 			log.Info("read message: %s", string(p))

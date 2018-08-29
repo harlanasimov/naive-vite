@@ -16,7 +16,7 @@ type Syncer interface {
 	Sender() Sender
 	Handlers() Handlers
 	DefaultHandler() MsgHandler
-	Init(face.AccountChainReader, face.SnapshotChainReader)
+	Init(face.ChainRw)
 }
 
 //type snapshotChainReader interface {
@@ -63,6 +63,7 @@ type syncer struct {
 	sender   *sender
 	fetcher  *fetcher
 	receiver *receiver
+	p2p      p2p.P2P
 }
 
 func (self *syncer) DefaultHandler() MsgHandler {
@@ -72,11 +73,13 @@ func (self *syncer) DefaultHandler() MsgHandler {
 func NewSyncer(net p2p.P2P) Syncer {
 	self := &syncer{}
 	self.sender = &sender{net: net}
+	self.p2p = net
 	return self
 }
-func (self *syncer) Init(aReader face.AccountChainReader, sReader face.SnapshotChainReader) {
+func (self *syncer) Init(rw face.ChainRw) {
 	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
-	self.receiver = newReceiver(self.fetcher, aReader, sReader, self.sender)
+	self.receiver = newReceiver(self.fetcher, rw, self.sender)
+	self.p2p.SetHandlerFn(self.receiver.Handle)
 }
 
 func (self *syncer) Fetcher() Fetcher {

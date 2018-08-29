@@ -22,13 +22,14 @@ func newLinker(p2p *p2p, u url.URL) *linker {
 }
 
 func (self *linker) start() {
-	log.Info("boot node connecting to %s", self.url.String())
+	log.Info("connecting to boot note[%s]", self.url.String())
 	c, _, err := websocket.DefaultDialer.Dial(self.url.String(), nil)
 	if err != nil {
 		log.Error("dial:", err)
 		return
 	}
 
+	log.Info("connected to boot node[%s]", self.url.String())
 	go self.loopRead(c)
 	go self.loopWrite(c)
 }

@@ -1,5 +1,7 @@
 package config
 
 type Node struct {
-	P2P P2P
+	P2pCfg       P2P
+	ConsensusCfg Consensus
+	MinerCfg     Miner
 }

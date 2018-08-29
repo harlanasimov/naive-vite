@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
+
+	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 )
@@ -60,4 +63,11 @@ func peerFull(self string, peers []Peer, N int) bool {
 		}
 	}
 	return true
+}
+
+func TestNewMsg(t *testing.T) {
+	msg := &Msg{T: common.State, Data: common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")}
+	bytes, _ := json.Marshal(msg)
+
+	println(string(bytes))
 }
