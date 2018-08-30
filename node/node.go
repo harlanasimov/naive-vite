@@ -2,7 +2,6 @@ package node
 
 import (
 	"sync"
-
 	"time"
 
 	"github.com/asaskevich/EventBus"
@@ -14,6 +13,7 @@ import (
 	"github.com/viteshan/naive-vite/miner"
 	"github.com/viteshan/naive-vite/p2p"
 	"github.com/viteshan/naive-vite/syncer"
+	"github.com/viteshan/naive-vite/wallet"
 )
 
 type Node interface {
@@ -23,6 +23,7 @@ type Node interface {
 	StartMiner()
 	StopMiner()
 	Leger() ledger.Ledger
+	Wallet() wallet.Wallet
 }
 
 func NewNode(cfg config.Node) Node {
@@ -46,6 +47,7 @@ type node struct {
 	ledger    ledger.Ledger
 	consensus consensus.Consensus
 	miner     miner.Miner
+	wallet    wallet.Wallet
 	bus       EventBus.Bus
 
 	cfg    config.Node
@@ -61,6 +63,7 @@ func (self *node) Init() {
 	if self.miner != nil {
 		self.miner.Init()
 	}
+	self.wallet = wallet.NewWallet()
 }
 
 func (self *node) Start() {
@@ -109,4 +112,8 @@ func (self *node) StopMiner() {
 
 func (self *node) Leger() ledger.Ledger {
 	return self.ledger
+}
+
+func (self *node) Wallet() wallet.Wallet {
+	return self.wallet
 }

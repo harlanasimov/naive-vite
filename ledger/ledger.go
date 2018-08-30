@@ -189,13 +189,30 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 func (self *ledger) selfAc(addr string) *AccountChain {
 	chain, ok := self.ac[addr]
 	if !ok {
-		return nil
+		self.initAc(addr)
+		return self.ac[addr]
 	}
 	return chain
 }
 
+func (self *ledger) initAc(address string) {
+	accountChain := NewAccountChain(address, self.reqPool)
+	accountPool := pool.NewAccountPool("accountChainPool-" + address)
+
+	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, pool.NewFetcher(address, self.syncer.Fetcher()), accountChain, self.rwMutex.RLocker(), accountChain)
+	accountPool.Start()
+
+	self.ac[address] = accountChain
+	self.pendingAc[address] = accountPool
+}
+
 func (self *ledger) selfPendingAc(addr string) *pool.AccountPool {
-	return self.pendingAc[addr]
+	p, ok := self.pendingAc[addr]
+	if !ok {
+		self.initAc(addr)
+		return self.pendingAc[addr]
+	}
+	return p
 }
 
 func (self *ledger) ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *common.SnapshotBlock) error {
