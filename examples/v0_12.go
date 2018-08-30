@@ -16,6 +16,7 @@ import (
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/ledger"
 	"github.com/viteshan/naive-vite/miner"
+	"github.com/viteshan/naive-vite/p2p"
 	"github.com/viteshan/naive-vite/syncer"
 )
 
@@ -26,6 +27,50 @@ type V0_12 struct {
 }
 
 type TestSyncer struct {
+}
+
+func (self *TestSyncer) BroadcastAccountBlocks(string, []*common.AccountStateBlock) error {
+	return nil
+}
+
+func (self *TestSyncer) BroadcastSnapshotBlocks([]*common.SnapshotBlock) error {
+	return nil
+}
+
+func (self *TestSyncer) SendAccountBlocks(string, []*common.AccountStateBlock, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) SendSnapshotBlocks([]*common.SnapshotBlock, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) SendAccountHashes(string, []common.HashHeight, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) SendSnapshotHashes([]common.HashHeight, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestAccountHash(string, common.HashHeight, int) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestSnapshotHash(common.HashHeight, int) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestAccountBlocks(string, []common.HashHeight) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestSnapshotBlocks([]common.HashHeight) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Init(face.ChainRw) {
+	panic("implement me")
 }
 
 func (self *TestSyncer) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
@@ -41,7 +86,7 @@ func (self *TestSyncer) Fetcher() syncer.Fetcher {
 }
 
 func (self *TestSyncer) Sender() syncer.Sender {
-	panic("implement me")
+	return self
 }
 
 func (self *TestSyncer) Handlers() syncer.Handlers {
@@ -52,9 +97,6 @@ func (self *TestSyncer) DefaultHandler() syncer.MsgHandler {
 	panic("implement me")
 }
 
-func (self *TestSyncer) Init(face.AccountChainReader, face.SnapshotChainReader) {
-	panic("implement me")
-}
 func newV0_12() *V0_12 {
 	self := &V0_12{}
 	self.nodes = make(map[string]string)
@@ -130,8 +172,6 @@ func (self *V0_12) handleConn(conn net.Conn) {
 		address = scanAddress.Text()
 	}
 
-	self.ledger.CreateAccount(address)
-
 	node := self.initNode(address)
 	defer self.destoryNode(node)
 
@@ -206,11 +246,6 @@ func (self *V0_12) sendTx(conn net.Conn, address string) {
 	var toAddress string
 	if scanTx.Scan() {
 		toAddress = scanTx.Text()
-		exists := self.ledger.ExistAccount(toAddress)
-		if !exists {
-			io.WriteString(conn, "address:"+toAddress+" not exists\n")
-			return
-		}
 	}
 	io.WriteString(conn, address+", Enter to amount:")
 

@@ -34,15 +34,15 @@ func (self *senderTest) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer 
 	panic("implement SendSnapshotBlocks")
 }
 
-func (self *senderTest) sendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
-	panic("implement sendAccountHashes")
+func (self *senderTest) SendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
+	panic("implement SendAccountHashes")
 }
 
-func (self *senderTest) sendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
-	panic("implement sendSnapshotHashes")
+func (self *senderTest) SendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
+	panic("implement SendSnapshotHashes")
 }
 
-func (self *senderTest) requestAccountHash(address string, height common.HashHeight, prevCnt int) error {
+func (self *senderTest) RequestAccountHash(address string, height common.HashHeight, prevCnt int) error {
 	go func() {
 		var hashes []common.HashHeight
 		height := height.Height
@@ -57,11 +57,11 @@ func (self *senderTest) requestAccountHash(address string, height common.HashHei
 	return nil
 }
 
-func (self *senderTest) requestSnapshotHash(height common.HashHeight, prevCnt int) error {
-	panic("implement requestSnapshotHash")
+func (self *senderTest) RequestSnapshotHash(height common.HashHeight, prevCnt int) error {
+	panic("implement RequestSnapshotHash")
 }
 
-func (self *senderTest) requestAccountBlocks(address string, hashes []common.HashHeight) error {
+func (self *senderTest) RequestAccountBlocks(address string, hashes []common.HashHeight) error {
 	go func() {
 		for _, v := range hashes {
 			block, ok := self.store[v.Hash]
@@ -74,8 +74,8 @@ func (self *senderTest) requestAccountBlocks(address string, hashes []common.Has
 
 	return nil
 }
-func (self *senderTest) requestSnapshotBlocks(hashes []common.HashHeight) error {
-	panic("implement requestSnapshotBlocks")
+func (self *senderTest) RequestSnapshotBlocks(hashes []common.HashHeight) error {
+	panic("implement RequestSnapshotBlocks")
 }
 
 func (self *senderTest) handle(blocks []common.Block) {

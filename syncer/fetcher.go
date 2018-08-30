@@ -90,10 +90,10 @@ type fetcher struct {
 }
 
 func (self *fetcher) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
-	self.sender.requestAccountHash(address, hash, prevCnt)
+	self.sender.RequestAccountHash(address, hash, prevCnt)
 }
 func (self *fetcher) FetchSnapshot(hash common.HashHeight, prevCnt int) {
-	self.sender.requestSnapshotHash(hash, prevCnt)
+	self.sender.RequestSnapshotHash(hash, prevCnt)
 }
 
 func (self *fetcher) fetchSnapshotBlockByHash(tasks []common.HashHeight) {
@@ -104,7 +104,7 @@ func (self *fetcher) fetchSnapshotBlockByHash(tasks []common.HashHeight) {
 		}
 	}
 	if len(target) > 0 {
-		self.sender.requestSnapshotBlocks(target)
+		self.sender.RequestSnapshotBlocks(target)
 	}
 }
 
@@ -116,7 +116,7 @@ func (self *fetcher) fetchAccountBlockByHash(address string, tasks []common.Hash
 		}
 	}
 	if len(target) > 0 {
-		self.sender.requestAccountBlocks(address, target)
+		self.sender.RequestAccountBlocks(address, target)
 	}
 }
 

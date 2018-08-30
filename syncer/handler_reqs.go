@@ -41,7 +41,7 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 	if len(hashes) == 0 {
 		return
 	}
-	self.sender.sendAccountHashes(msg.Address, hashes, p)
+	self.sender.SendAccountHashes(msg.Address, hashes, p)
 }
 
 func (self *reqAccountHashHandler) Id() string {
@@ -81,7 +81,7 @@ func (self *reqSnapshotHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.
 	if len(hashes) == 0 {
 		return
 	}
-	self.sender.sendSnapshotHashes(hashes, p)
+	self.sender.SendSnapshotHashes(hashes, p)
 }
 
 func (self *reqSnapshotHashHandler) Id() string {

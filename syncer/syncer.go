@@ -40,13 +40,13 @@ type Sender interface {
 	SendAccountBlocks(string, []*common.AccountStateBlock, p2p.Peer) error
 	SendSnapshotBlocks([]*common.SnapshotBlock, p2p.Peer) error
 
-	sendAccountHashes(string, []common.HashHeight, p2p.Peer) error
-	sendSnapshotHashes([]common.HashHeight, p2p.Peer) error
+	SendAccountHashes(string, []common.HashHeight, p2p.Peer) error
+	SendSnapshotHashes([]common.HashHeight, p2p.Peer) error
 
-	requestAccountHash(string, common.HashHeight, int) error
-	requestSnapshotHash(common.HashHeight, int) error
-	requestAccountBlocks(string, []common.HashHeight) error
-	requestSnapshotBlocks([]common.HashHeight) error
+	RequestAccountHash(string, common.HashHeight, int) error
+	RequestSnapshotHash(common.HashHeight, int) error
+	RequestAccountBlocks(string, []common.HashHeight) error
+	RequestSnapshotBlocks([]common.HashHeight) error
 }
 type MsgHandler interface {
 	Handle(common.NetMsgType, []byte, p2p.Peer)

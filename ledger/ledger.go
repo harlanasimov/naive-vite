@@ -28,11 +28,9 @@ type Ledger interface {
 	RequestAccountBlock(from string, to string, amount int) error
 	ResponseAccountBlock(from string, to string, reqHash string) error
 	// create account genesis block
-	CreateAccount(address string) error
 	HeadAccount(address string) (*common.AccountStateBlock, error)
 	HeadSnapshost() (*common.SnapshotBlock, error)
 	GetAccountBalance(address string) int
-	ExistAccount(address string) bool
 	ListRequest(address string) []*Req
 	Start()
 	Stop()
@@ -86,25 +84,6 @@ func (self *ledger) HeadSnapshost() (*common.SnapshotBlock, error) {
 	return block, nil
 }
 
-func (self *ledger) CreateAccount(address string) error {
-	head := self.sc.Head()
-	if self.ac[address] != nil {
-		log.Warn("exist account for %s.", address)
-		return errors.New("exist account " + address)
-	}
-	accountChain := NewAccountChain(address, self.reqPool, head.Height(), head.Hash())
-	accountPool := pool.NewAccountPool("accountChainPool-" + address)
-
-	accountPool.Init(accountChain.insertChain, accountChain.removeChain, self.accountVerifier, pool.NewFetcher(address, self.syncer.Fetcher()), accountChain, self.rwMutex.RLocker(), accountChain)
-	self.ac[address] = accountChain
-	self.pendingAc[address] = accountPool
-	accountPool.Start()
-	return nil
-}
-
-func (self *ledger) ExistAccount(address string) bool {
-	return self.selfAc(address) != nil
-}
 func (self *ledger) GetAccountBalance(address string) int {
 	ac := self.selfAc(address)
 	if ac == nil || ac.Head() == nil {
@@ -368,7 +347,7 @@ func (self *ledger) Init(syncer syncer.Syncer) {
 	acs := make(map[string]*AccountChain)
 	accounts := Accounts()
 	for _, account := range accounts {
-		ac := NewAccountChain(account, self.reqPool, sc.head.Height(), sc.head.Hash())
+		ac := NewAccountChain(account, self.reqPool)
 		accountPool := pool.NewAccountPool("accountChainPool-" + account)
 		accountPool.Init(ac.insertChain, ac.removeChain, self.accountVerifier, pool.NewFetcher(account, syncer.Fetcher()), ac, self.rwMutex.RLocker(), ac)
 		acs[account] = ac

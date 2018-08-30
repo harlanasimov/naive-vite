@@ -86,34 +86,34 @@ func (self *sender) SendSnapshotBlocks(blocks []*common.SnapshotBlock, peer p2p.
 
 }
 
-func (self *sender) sendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
+func (self *sender) SendAccountHashes(address string, hashes []common.HashHeight, peer p2p.Peer) error {
 	bytM, err := json.Marshal(&accountHashesMsg{Address: address, Hashes: hashes})
 	if err != nil {
-		return errors.New("sendAccountHashes, format fail. err:" + err.Error())
+		return errors.New("SendAccountHashes, format fail. err:" + err.Error())
 	}
 	msg := p2p.NewMsg(common.AccountHashes, bytM)
 	err = peer.Write(msg)
 	if err != nil {
-		log.Error("sendAccountHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
+		log.Error("SendAccountHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
 	}
 	return err
 }
 
-func (self *sender) sendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
+func (self *sender) SendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer) error {
 	bytM, err := json.Marshal(&snapshotHashesMsg{Hashes: hashes})
 	if err != nil {
-		return errors.New("sendSnapshotHashes, format fail. err:" + err.Error())
+		return errors.New("SendSnapshotHashes, format fail. err:" + err.Error())
 	}
 	msg := p2p.NewMsg(common.SnapshotHashes, bytM)
 	err = peer.Write(msg)
 	if err != nil {
-		log.Error("sendSnapshotHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
+		log.Error("SendSnapshotHashes, write peer fail. peer:%s, err:%v", peer.Id(), err)
 	}
 	return err
 
 }
 
-func (self *sender) requestAccountHash(address string, height common.HashHeight, prevCnt int) error {
+func (self *sender) RequestAccountHash(address string, height common.HashHeight, prevCnt int) error {
 	peer, e := self.net.BestPeer()
 	if e != nil {
 		log.Error("sendAccountHash, can't get best peer. err:%v", e)
@@ -132,7 +132,7 @@ func (self *sender) requestAccountHash(address string, height common.HashHeight,
 	return err
 }
 
-func (self *sender) requestSnapshotHash(height common.HashHeight, prevCnt int) error {
+func (self *sender) RequestSnapshotHash(height common.HashHeight, prevCnt int) error {
 	peer, e := self.net.BestPeer()
 	if e != nil {
 		log.Error("sendSnapshotHash, can't get best peer. err:%v", e)
@@ -151,39 +151,39 @@ func (self *sender) requestSnapshotHash(height common.HashHeight, prevCnt int) e
 	return err
 }
 
-func (self *sender) requestAccountBlocks(address string, hashes []common.HashHeight) error {
+func (self *sender) RequestAccountBlocks(address string, hashes []common.HashHeight) error {
 	peer, e := self.net.BestPeer()
 	if e != nil {
-		log.Error("requestAccountBlocks, can't get best peer. err:%v", e)
+		log.Error("RequestAccountBlocks, can't get best peer. err:%v", e)
 		return e
 	}
 	m := requestAccountBlockMsg{Address: address, Hashes: hashes}
 	bytM, err := json.Marshal(&m)
 	if err != nil {
-		return errors.New("requestAccountBlocks, format fail. err:" + err.Error())
+		return errors.New("RequestAccountBlocks, format fail. err:" + err.Error())
 	}
 	msg := p2p.NewMsg(common.RequestAccountBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
-		log.Error("requestAccountBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
+		log.Error("RequestAccountBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
 	}
 	return err
 }
-func (self *sender) requestSnapshotBlocks(hashes []common.HashHeight) error {
+func (self *sender) RequestSnapshotBlocks(hashes []common.HashHeight) error {
 	peer, e := self.net.BestPeer()
 	if e != nil {
-		log.Error("requestSnapshotBlocks, can't get best peer. err:%v", e)
+		log.Error("RequestSnapshotBlocks, can't get best peer. err:%v", e)
 		return e
 	}
 	m := requestSnapshotBlockMsg{Hashes: hashes}
 	bytM, err := json.Marshal(&m)
 	if err != nil {
-		return errors.New("requestSnapshotBlocks, format fail. err:" + err.Error())
+		return errors.New("RequestSnapshotBlocks, format fail. err:" + err.Error())
 	}
 	msg := p2p.NewMsg(common.RequestSnapshotBlocks, bytM)
 	err = peer.Write(msg)
 	if err != nil {
-		log.Error("requestSnapshotBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
+		log.Error("RequestSnapshotBlocks, write peer fail. peer:%s, err:%v", peer.Id(), err)
 	}
 	return err
 }
