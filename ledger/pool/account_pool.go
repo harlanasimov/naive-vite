@@ -18,11 +18,14 @@ type AccountPool struct {
 	BCPool
 	accountReader accountReader
 	mu            sync.Locker
+	closed        chan struct{}
+	wg            sync.WaitGroup
 }
 
 func NewAccountPool(name string) *AccountPool {
 	pool := &AccountPool{}
 	pool.Id = name
+	pool.closed = make(chan struct{})
 	return pool
 }
 
@@ -65,42 +68,6 @@ func (self *AccountPool) TryRollback(rollbackHeight int, rollbackHash string) ([
 	return sendBlocks, nil
 }
 
-//func (self *AccountPool) RollbackAndForkAccount(target *common.AccountHashH, forkPoint *common.SnapshotBlock) error {
-//	err := self.rollbackDisk(forkPoint.Height(), forkPoint.Hash())
-//	if err != nil {
-//		return err
-//	}
-//	if target == nil {
-//		return nil
-//	}
-//	return self.currentModify(target.Height, target.Hash)
-//}
-func (self *AccountPool) ForkAccount(target *common.AccountHashH) error {
-
-	//return self.currentModify(target)
-	return nil
-}
-
-// rollback to current
-//func (self *AccountPool) rollbackDisk(snapshotHeight int, snapshotHash string) error {
-//	head := self.chainpool.diskChain.Head().(*common.AccountStateBlock)
-//	if head.SnapshotHeight < snapshotHeight {
-//		return nil
-//	}
-//
-//	accountBlock := self.accountReader.FindBlockAboveSnapshotHeight(snapshotHeight)
-//	var err error
-//	if accountBlock == nil {
-//		err = self.RollbackAll()
-//	} else {
-//		err = self.Rollback(accountBlock)
-//	}
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-
 // rollback to current
 func (self *AccountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, snapshotHash string) (bool, *common.AccountStateBlock, error) {
 	head := self.chainpool.diskChain.Head().(*common.AccountStateBlock)
@@ -132,12 +99,18 @@ func (self *AccountPool) FindRollbackPointForAccountHashH(height int, hash strin
 }
 
 func (self *AccountPool) loop() {
+	defer self.wg.Done()
 	for {
-		self.LoopGenSnippetChains()
-		self.LoopAppendChains()
-		self.LoopFetchForSnippets()
-		self.loopCheckCurrentInsert()
-		time.Sleep(time.Second)
+		select {
+		case <-self.closed:
+			return
+		default:
+			self.LoopGenSnippetChains()
+			self.LoopAppendChains()
+			self.LoopFetchForSnippets()
+			self.loopCheckCurrentInsert()
+			time.Sleep(time.Second)
+		}
 	}
 }
 
@@ -147,7 +120,15 @@ func (self *AccountPool) loopCheckCurrentInsert() {
 	self.CheckCurrentInsert(self.insertAccountFailCallback, self.insertAccountSuccessCallback)
 }
 func (self *AccountPool) Start() {
+	self.wg.Add(1)
 	go self.loop()
+	log.Info("snapshot_pool[%s] stopped", self.Id)
+}
+
+func (self *AccountPool) Stop() {
+	close(self.closed)
+	self.wg.Wait()
+	log.Info("account_pool[%s] stopped", self.Id)
 }
 
 func (self *AccountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {

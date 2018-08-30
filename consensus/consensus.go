@@ -34,4 +34,5 @@ type Consensus interface {
 	Subscribe(subscribeMem *SubscribeMem)
 	Init()
 	Start()
+	Stop()
 }

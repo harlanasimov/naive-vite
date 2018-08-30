@@ -35,6 +35,7 @@ type Ledger interface {
 	ExistAccount(address string) bool
 	ListRequest(address string) []*Req
 	Start()
+	Stop()
 	Init(syncer syncer.Syncer)
 }
 
@@ -387,9 +388,15 @@ func (self *ledger) GetReferred(account string, sourceHash string) *common.Accou
 	return nil
 }
 func (self *ledger) Start() {
-	self.pendingSc.Start()
 	for _, pending := range self.pendingAc {
 		pending.Start()
+	}
+	self.pendingSc.Start()
+}
+func (self *ledger) Stop() {
+	self.pendingSc.Stop()
+	for _, pending := range self.pendingAc {
+		pending.Stop()
 	}
 }
 

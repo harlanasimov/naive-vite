@@ -31,11 +31,12 @@ func TestNode(t *testing.T) {
 		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
 		MinerCfg:     config.Miner{Enabled: true, HexCoinbase: "vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8"},
 	}
-	n := node{}
-	n.Init(cfg)
+	n := NewNode(cfg)
+	n.Init()
 	n.Start()
 
 	time.Sleep(200 * time.Second)
+	n.Stop()
 }
 
 func startBoot(bootAddr string) p2p.Boot {
@@ -65,7 +66,8 @@ func TestNode_Start(t *testing.T) {
 		P2pCfg:       config.P2P{NodeId: strconv.Itoa(i), Port: 8080 + i, LinkBootAddr: bootAddr, NetId: 0},
 		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
 	}
-	n := node{}
-	n.Init(cfg)
+	n := NewNode(cfg)
+	n.Init()
 	n.Start()
+	time.Sleep(200 * time.Second)
 }

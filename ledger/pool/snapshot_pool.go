@@ -15,6 +15,8 @@ type SnapshotPool struct {
 	BCPool
 	rwMu      *sync.RWMutex
 	consensus consensus.AccountsConsensus
+	closed    chan struct{}
+	wg        sync.WaitGroup
 }
 
 func NewSnapshotPool(name string) *SnapshotPool {
@@ -36,10 +38,16 @@ func (self *SnapshotPool) Init(insertChainFn insertChainForkCheck,
 }
 
 func (self *SnapshotPool) loopCheckFork() {
+	defer self.wg.Done()
 	for {
-		self.checkFork()
-		// check fork every 2 sec.
-		time.Sleep(2 * time.Second)
+		select {
+		case <-self.closed:
+			return
+		default:
+			self.checkFork()
+			// check fork every 2 sec.
+			time.Sleep(2 * time.Second)
+		}
 	}
 }
 
@@ -93,12 +101,19 @@ func (self *SnapshotPool) snapshotFork(longest Chain, current Chain) {
 }
 
 func (self *SnapshotPool) loop() {
+	defer self.wg.Done()
 	for {
-		self.LoopGenSnippetChains()
-		self.LoopAppendChains()
-		self.LoopFetchForSnippets()
-		self.loopCheckCurrentInsert()
-		time.Sleep(time.Second)
+		select {
+		case <-self.closed:
+			return
+		default:
+			self.LoopGenSnippetChains()
+			self.LoopAppendChains()
+			self.LoopFetchForSnippets()
+			self.loopCheckCurrentInsert()
+			time.Sleep(time.Second)
+		}
+
 	}
 }
 
@@ -108,8 +123,16 @@ func (self *SnapshotPool) loopCheckCurrentInsert() {
 	self.CheckCurrentInsert(self.insertSnapshotFailCallback, self.insertSnapshotSuccessCallback)
 }
 func (self *SnapshotPool) Start() {
+	self.wg.Add(1)
 	go self.loop()
+	self.wg.Add(1)
 	go self.loopCheckFork()
+	log.Info("snapshot_pool[%s] started.", self.Id)
+}
+func (self *SnapshotPool) Stop() {
+	close(self.closed)
+	self.wg.Wait()
+	log.Info("snapshot_pool[%s] stopped.", self.Id)
 }
 
 func (self *SnapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.BlockVerifyStat) {

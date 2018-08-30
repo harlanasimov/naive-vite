@@ -79,7 +79,7 @@ func NewSyncer(net p2p.P2P) Syncer {
 func (self *syncer) Init(rw face.ChainRw) {
 	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
 	self.receiver = newReceiver(self.fetcher, rw, self.sender)
-	self.p2p.SetHandlerFn(self.receiver.Handle)
+	self.p2p.SetHandlerFn(self.DefaultHandler().Handle)
 }
 
 func (self *syncer) Fetcher() Fetcher {
