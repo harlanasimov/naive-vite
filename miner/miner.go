@@ -7,6 +7,7 @@ import (
 	"github.com/asaskevich/EventBus"
 	"github.com/vitelabs/go-vite/common/types"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 )
@@ -52,24 +53,25 @@ type Miner interface {
 
 type miner struct {
 	MinerLifecycle
-	chain       SnapshotChainRW
-	mining      int32
-	coinbase    common.Address // address
-	worker      *worker
-	consensus   consensus.Consensus
-	mem         *consensus.SubscribeMem
-	bus         EventBus.Bus
-	dwlFinished bool
+	chain      SnapshotChainRW
+	mining     int32
+	coinbase   common.Address // address
+	worker     *worker
+	consensus  consensus.Consensus
+	mem        *consensus.SubscribeMem
+	bus        EventBus.Bus
+	syncStatus face.SyncStatus
 }
 
-func NewMiner(chain SnapshotChainRW, bus EventBus.Bus, coinbase common.Address, con consensus.Consensus) Miner {
+func NewMiner(chain SnapshotChainRW, syncStatus face.SyncStatus, bus EventBus.Bus, coinbase common.Address, con consensus.Consensus) Miner {
 	miner := &miner{chain: chain, coinbase: coinbase}
 
 	miner.consensus = con
 	miner.mem = &consensus.SubscribeMem{Mem: miner.coinbase, Notify: make(chan time.Time)}
 	miner.worker = &worker{chain: chain, workChan: miner.mem.Notify, coinbase: coinbase}
 	miner.bus = bus
-	miner.dwlFinished = false
+	miner.syncStatus = syncStatus
+
 	return miner
 }
 func (self *miner) Init() {
@@ -77,8 +79,7 @@ func (self *miner) Init() {
 	defer self.PostInit()
 	self.worker.Init()
 	dwlDownFn := func() {
-		log.Info("downloader success.")
-		self.dwlFinished = true
+		log.Info("sync success.")
 		self.consensus.Subscribe(self.mem)
 	}
 	self.bus.SubscribeOnce(common.DwlDone, dwlDownFn)
@@ -88,7 +89,7 @@ func (self *miner) Start() {
 	self.PreStart()
 	defer self.PostStart()
 
-	if self.dwlFinished {
+	if self.syncStatus.Done() {
 		self.consensus.Subscribe(self.mem)
 	}
 	self.worker.Start()

@@ -29,6 +29,10 @@ type V0_12 struct {
 type TestSyncer struct {
 }
 
+func (self *TestSyncer) Done() bool {
+	return true
+}
+
 func (self *TestSyncer) BroadcastAccountBlocks(string, []*common.AccountStateBlock) error {
 	return nil
 }
@@ -102,7 +106,8 @@ func newV0_12() *V0_12 {
 	self.nodes = make(map[string]string)
 	self.chainmutex = &sync.Mutex{}
 	self.ledger = ledger.NewLedger()
-	self.ledger.Init(&TestSyncer{})
+	testSyncer := &TestSyncer{}
+	self.ledger.Init(testSyncer)
 
 	self.ledger.Start()
 	genesisTime := ledger.GetGenesisSnapshot().Timestamp()
@@ -110,7 +115,7 @@ func newV0_12() *V0_12 {
 
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
-	miner := miner.NewMiner(self.ledger, bus, coinbase, committee)
+	miner := miner.NewMiner(self.ledger, testSyncer, bus, coinbase, committee)
 
 	committee.Init()
 	miner.Init()

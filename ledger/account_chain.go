@@ -28,7 +28,7 @@ var blank = common.NewAccountBlock(-1, "", "", "", time.Unix(1533550870, 0),
 func NewAccountChain(address string, reqPool *reqPool) *AccountChain {
 	self := &AccountChain{}
 	self.address = address
-	self.head = common.NewAccountBlock(0, "", "", address, time.Now(),
+	self.head = common.NewAccountBlock(0, "", "", address, GetGenesisSnapshot().Timestamp(),
 		100, 0, GetGenesisSnapshot().Height(), GetGenesisSnapshot().Hash(), common.CREATE, address, address, "")
 	self.head.SetHash(tools.CalculateAccountHash(self.head))
 	self.accountDB = make(map[string]*common.AccountStateBlock)
@@ -49,6 +49,17 @@ func (self *AccountChain) GetBlock(height int) common.Block {
 	if height == -1 {
 		return blank
 	}
+	if height < 0 {
+		log.Error("can't request height 0 block. account:%s", self.address)
+		return nil
+	}
+	block, ok := self.accountHeightDB[height]
+	if ok {
+		return block
+	}
+	return nil
+}
+func (self *AccountChain) GetBlockByHeight(height int) *common.AccountStateBlock {
 	if height < 0 {
 		log.Error("can't request height 0 block. account:%s", self.address)
 		return nil
@@ -134,6 +145,10 @@ func (self *AccountChain) NextSnapshotPoint() (int, string) {
 
 	if lastPoint == nil {
 		if self.head != nil {
+			return self.head.Height(), self.head.Hash()
+		}
+	} else {
+		if lastPoint.AccountHeight < self.head.Height() {
 			return self.head.Height(), self.head.Hash()
 		}
 	}

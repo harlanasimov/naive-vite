@@ -140,8 +140,9 @@ func (self *p2p) loopPeer(peer *peer) {
 				if self.msgHandleFn != nil {
 					self.msgHandleFn(msg.T, msg.Data, peer)
 				}
+			} else {
+				log.Info("read message: %s", string(p))
 			}
-			log.Info("read message: %s", string(p))
 		}
 	}
 }
@@ -182,6 +183,8 @@ func (self *p2p) loop() {
 					connectted := self.dial.connect(v)
 					if connectted {
 						log.Info("connect success." + self.server.id + ":" + i)
+						delete(self.pendingDials, i)
+					} else {
 						delete(self.pendingDials, i)
 					}
 				} else {

@@ -26,6 +26,8 @@ func NewAccountPool(name string) *AccountPool {
 	pool := &AccountPool{}
 	pool.Id = name
 	pool.closed = make(chan struct{})
+	pool.verifierFailcallback = pool.insertAccountFailCallback
+	pool.verifierSuccesscallback = pool.insertAccountSuccessCallback
 	return pool
 }
 
@@ -117,12 +119,12 @@ func (self *AccountPool) loop() {
 func (self *AccountPool) loopCheckCurrentInsert() {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	self.CheckCurrentInsert(self.insertAccountFailCallback, self.insertAccountSuccessCallback)
+	self.CheckCurrentInsert()
 }
 func (self *AccountPool) Start() {
 	self.wg.Add(1)
 	go self.loop()
-	log.Info("snapshot_pool[%s] stopped", self.Id)
+	log.Info("account_pool[%s] started", self.Id)
 }
 
 func (self *AccountPool) Stop() {
@@ -137,4 +139,18 @@ func (self *AccountPool) insertAccountFailCallback(b common.Block, s verifier.Bl
 
 func (self *AccountPool) insertAccountSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
 	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
+}
+func (self *AccountPool) FindInChain(hash string, height int) bool {
+
+	for _, c := range self.chainpool.chains {
+		b := c.heightBlocks[height]
+		if b == nil {
+			continue
+		} else {
+			if b.block.Hash() == hash {
+				return true
+			}
+		}
+	}
+	return false
 }

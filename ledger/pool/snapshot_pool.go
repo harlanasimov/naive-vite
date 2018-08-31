@@ -22,6 +22,8 @@ type SnapshotPool struct {
 func NewSnapshotPool(name string) *SnapshotPool {
 	pool := &SnapshotPool{}
 	pool.Id = name
+	pool.verifierFailcallback = pool.insertSnapshotFailCallback
+	pool.verifierSuccesscallback = pool.insertSnapshotSuccessCallback
 	return pool
 }
 
@@ -120,7 +122,48 @@ func (self *SnapshotPool) loop() {
 func (self *SnapshotPool) loopCheckCurrentInsert() {
 	self.rwMu.RLock()
 	defer self.rwMu.RUnlock()
-	self.CheckCurrentInsert(self.insertSnapshotFailCallback, self.insertSnapshotSuccessCallback)
+	self.checkSnapshot()
+}
+
+func (self *SnapshotPool) checkSnapshot() {
+	pool := self.chainpool
+	current := pool.current
+	minH := current.tailHeight + 1
+	headH := current.headHeight
+L:
+	for i := minH; i <= headH; i++ {
+		wrapper := current.getBlock(i, false)
+		block := wrapper.block
+		stat := wrapper.verifyStat
+		//if !wrapper.checkForkVersion() {
+		wrapper.reset()
+		//}
+		pool.verifier.VerifyReferred(block, stat)
+		if !wrapper.checkForkVersion() {
+			wrapper.reset()
+			continue
+		}
+		result := stat.VerifyResult()
+		switch result {
+		case verifier.PENDING:
+			self.snapshotPendingCallback(block, stat)
+		case verifier.FAIL:
+			log.Error("forkedChain forked. verify result is %s. block info:account[%s],hash[%s],height[%d]",
+				result, block.Signer(), block.Hash(), block.Height())
+			self.insertSnapshotFailCallback(block, stat)
+			break L
+		case verifier.SUCCESS:
+			if block.Height() == current.tailHeight+1 {
+				err := pool.writeToChain(current, wrapper)
+				if err == nil {
+					self.insertSnapshotSuccessCallback(block, stat)
+				}
+			}
+		default:
+			log.Error("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
+				result, block.Signer(), block.Hash(), block.Height())
+		}
+	}
 }
 func (self *SnapshotPool) Start() {
 	self.wg.Add(1)
@@ -144,6 +187,19 @@ func (self *SnapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.
 		result := results[account.Addr]
 		if result == verifier.FAIL {
 			self.consensus.ForkAccountTo(account)
+		}
+	}
+}
+
+func (self *SnapshotPool) snapshotPendingCallback(b common.Block, s verifier.BlockVerifyStat) {
+	block := b.(*common.SnapshotBlock)
+	stat := s.(*verifier.SnapshotBlockVerifyStat)
+	results := stat.Results()
+
+	for _, account := range block.Accounts {
+		result := results[account.Addr]
+		if result == verifier.PENDING {
+			self.consensus.PendingAccountTo(account)
 		}
 	}
 }

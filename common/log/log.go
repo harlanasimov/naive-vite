@@ -2,8 +2,23 @@ package log
 
 import (
 	"log"
+	"math/rand"
 	"os"
+	"strconv"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+	fileName := "testlogfile." + strconv.Itoa(rand.Intn(10000))
+	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	} else {
+		log.Printf("log file:%s\n", fileName)
+	}
+	log.SetOutput(f)
+}
 
 func Debug(msg string, ctx ...interface{}) {
 	log.Printf("[Debug]"+msg+"\n", ctx...)

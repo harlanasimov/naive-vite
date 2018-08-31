@@ -30,6 +30,9 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 	hashH := common.HashHeight{Hash: msg.Hash, Height: msg.Height}
 
 	for i := msg.PrevCnt; i > 0; i-- {
+		if i < 0 {
+			break
+		}
 		block := self.aReader.GetAccountBlocksByHashH(msg.Address, hashH)
 		if block == nil {
 			break
@@ -70,6 +73,9 @@ func (self *reqSnapshotHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.
 	hashH := common.HashHeight{Hash: msg.Hash, Height: msg.Height}
 
 	for i := msg.PrevCnt; i > 0; i-- {
+		if i < 0 {
+			break
+		}
 		block := self.sReader.GetSnapshotBlocksByHashH(hashH)
 		if block == nil {
 			break

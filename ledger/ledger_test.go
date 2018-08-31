@@ -11,6 +11,7 @@ import (
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/miner"
+	"github.com/viteshan/naive-vite/p2p"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/test"
 	"github.com/viteshan/naive-vite/tools"
@@ -21,8 +22,52 @@ type TestSyncer struct {
 	f      syncer.Fetcher
 }
 
-func (self *TestSyncer) Init(face.AccountChainReader, face.SnapshotChainReader) {
+func (self *TestSyncer) BroadcastAccountBlocks(string, []*common.AccountStateBlock) error {
+	return nil
+}
+
+func (self *TestSyncer) BroadcastSnapshotBlocks([]*common.SnapshotBlock) error {
+	return nil
+}
+
+func (self *TestSyncer) SendAccountBlocks(string, []*common.AccountStateBlock, p2p.Peer) error {
 	panic("implement me")
+}
+
+func (self *TestSyncer) SendSnapshotBlocks([]*common.SnapshotBlock, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) SendAccountHashes(string, []common.HashHeight, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) SendSnapshotHashes([]common.HashHeight, p2p.Peer) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestAccountHash(string, common.HashHeight, int) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestSnapshotHash(common.HashHeight, int) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestAccountBlocks(string, []common.HashHeight) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) RequestSnapshotBlocks([]common.HashHeight) error {
+	panic("implement me")
+}
+
+func (self *TestSyncer) Init(face.ChainRw) {
+
+}
+
+func (self *TestSyncer) Done() bool {
+	return true
 }
 
 func (self *TestSyncer) DefaultHandler() syncer.MsgHandler {
@@ -40,7 +85,7 @@ func (self *TestSyncer) Fetcher() syncer.Fetcher {
 }
 
 func (self *TestSyncer) Sender() syncer.Sender {
-	panic("implement me")
+	return self
 }
 
 func (self *TestSyncer) Handlers() syncer.Handlers {
@@ -80,8 +125,6 @@ func TestLedger(t *testing.T) {
 	}
 
 	viteshan1 := "viteshan1"
-	ledger.CreateAccount(viteshan)
-	ledger.CreateAccount(viteshan1)
 	time.Sleep(5 * time.Second)
 	{
 		var err error
@@ -130,7 +173,6 @@ func TestSnapshotFork(t *testing.T) {
 	ledger.AddSnapshotBlock(block)
 
 	viteshan := "viteshan1"
-	ledger.CreateAccount(viteshan)
 	accountH0, _ := ledger.HeadAccount(viteshan)
 
 	block2 := block
@@ -171,7 +213,6 @@ func TestAccountFork(t *testing.T) {
 	ledger.AddSnapshotBlock(block)
 
 	viteshan := "viteshan1"
-	ledger.CreateAccount(viteshan)
 	accountH0, _ := ledger.HeadAccount(viteshan)
 	accountH1 := genAccountBlockBy(viteshan, block, accountH0, 0)
 	accountH20 := genAccountBlockBy(viteshan, block, accountH1, 0)
@@ -239,12 +280,31 @@ func TestLedger_MiningSnapshotBlock(t *testing.T) {
 	ledger := NewLedger()
 	ledger.Init(testSyncer)
 	ledger.Start()
+
+	committee := genCommitee()
+	miner, bus := genMiner(committee, ledger, testSyncer)
+
+	committee.Init()
+	miner.Init()
+	committee.Start()
+	miner.Start()
+	var c chan int = make(chan int)
+	select {
+	case c <- 0:
+	case <-time.After(5 * time.Second):
+		println("timeout and downloader finish.")
+		//miner.downloaderRegisterCh <- 0
+		bus.Publish(common.DwlDone)
+		println("-----------timeout")
+	}
+
+	c <- 0
 }
 
-func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW) (miner.Miner, EventBus.Bus) {
+func genMiner(committee *consensus.Committee, rw miner.SnapshotChainRW, status face.SyncStatus) (miner.Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
-	miner := miner.NewMiner(rw, bus, coinbase, committee)
+	miner := miner.NewMiner(rw, status, bus, coinbase, committee)
 	return miner, bus
 }
 
@@ -261,7 +321,7 @@ func TestNewMiner(t *testing.T) {
 	ledger.Start()
 
 	committee := genCommitee()
-	miner, bus := genMiner(committee, ledger)
+	miner, bus := genMiner(committee, ledger, testSyncer)
 
 	committee.Init()
 	miner.Init()
@@ -270,12 +330,23 @@ func TestNewMiner(t *testing.T) {
 	var c chan int = make(chan int)
 	select {
 	case c <- 0:
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		println("timeout and downloader finish.")
 		//miner.downloaderRegisterCh <- 0
 		bus.Publish(common.DwlDone)
 		println("-----------timeout")
 	}
+
+	time.Sleep(10 * time.Second)
+	println("-----------add")
+
+	viteshan := "viteshan1"
+	accountH0, _ := ledger.HeadAccount(viteshan)
+
+	block := ledger.sc.head
+
+	accountH1 := genAccountBlockBy(viteshan, block, accountH0, 0)
+	ledger.AddAccountBlock(viteshan, accountH1)
 
 	c <- 0
 }

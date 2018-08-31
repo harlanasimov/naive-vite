@@ -25,8 +25,8 @@ func (self *TestPeer) GetState() interface{} {
 }
 
 func (self *TestPeer) Write(msg *p2p.Msg) error {
-	log.Info("write msg, msgType:%s", msg.Type())
-	self.fn(msg.Type(), msg.Data(), self)
+	log.Info("write msg, msgType:%s", msg.T)
+	self.fn(msg.T, msg.Data, self)
 	return nil
 }
 

@@ -25,6 +25,7 @@ type AccountsConsensus interface {
 	ForkAccountTo(h *common.AccountHashH) error
 	SnapshotAccount(block *common.SnapshotBlock, h *common.AccountHashH)
 	UnLockAccounts(startAcs map[string]*common.SnapshotPoint, endAcs map[string]*common.SnapshotPoint) error
+	PendingAccountTo(h *common.AccountHashH) error
 }
 
 type Consensus interface {

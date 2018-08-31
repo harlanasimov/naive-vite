@@ -7,7 +7,7 @@ type Miner struct {
 	HexCoinbase string
 }
 
-func (self *Miner) CoinBase() common.Address {
+func (self Miner) CoinBase() common.Address {
 	coinbase := common.HexToAddress(self.HexCoinbase)
 	return coinbase
 }

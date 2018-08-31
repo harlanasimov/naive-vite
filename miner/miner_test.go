@@ -7,6 +7,7 @@ import (
 
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/ledger"
 )
@@ -20,19 +21,19 @@ func (SnapshotRW) MiningSnapshotBlock(address string, timestamp int64) error {
 	return nil
 }
 
-func genMiner(committee *consensus.Committee) (Miner, EventBus.Bus) {
+func genMiner(committee *consensus.Committee, status face.SyncStatus) (Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}
-	miner := NewMiner(rw, bus, coinbase, committee)
+	miner := NewMiner(rw, status, bus, coinbase, committee)
 	return miner, bus
 }
 
-func genMinerAuto(committee *consensus.Committee) (Miner, EventBus.Bus) {
+func genMinerAuto(committee *consensus.Committee, status face.SyncStatus) (Miner, EventBus.Bus) {
 	bus := EventBus.New()
 	coinbase := common.HexToAddress("vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8")
 	rw := &SnapshotRW{}
-	miner := NewMiner(rw, bus, coinbase, committee)
+	miner := NewMiner(rw, status, bus, coinbase, committee)
 	return miner, bus
 }
 
@@ -42,9 +43,16 @@ func genCommitee() *consensus.Committee {
 	return committee
 }
 
+type testSyncStatus struct {
+}
+
+func (*testSyncStatus) Done() bool {
+	return true
+}
+
 func TestNewMiner(t *testing.T) {
 	committee := genCommitee()
-	miner, bus := genMiner(committee)
+	miner, bus := genMiner(committee, &testSyncStatus{})
 
 	committee.Init()
 	miner.Init()
@@ -104,7 +112,7 @@ func TestChan(t *testing.T) {
 
 func TestLifecycle(t *testing.T) {
 	commitee := genCommitee()
-	miner, bus := genMinerAuto(commitee)
+	miner, bus := genMinerAuto(commitee, &testSyncStatus{})
 
 	commitee.Init()
 	miner.Init()

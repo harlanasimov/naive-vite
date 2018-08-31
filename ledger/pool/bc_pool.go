@@ -35,16 +35,19 @@ type heightChainReader interface {
 	id() string
 	getBlock(height int, refer bool) *BlockForPool
 	contains(height int) bool
+	Head() common.Block
 }
 
 var pendingMu sync.Mutex
 
 type BCPool struct {
-	Id        string
-	blockpool *blockPool
-	chainpool *chainPool
-	syncer    *fetcher
-	verifier  verifier.Verifier
+	Id                      string
+	blockpool               *blockPool
+	chainpool               *chainPool
+	syncer                  *fetcher
+	verifier                verifier.Verifier
+	verifierFailcallback    verifier.Callback
+	verifierSuccesscallback verifier.Callback
 }
 
 type blockPool struct {
@@ -172,6 +175,14 @@ func (self *snippetChain) deleteTail(newtail *BlockForPool) {
 	self.tailHash = newtail.block.Hash()
 	self.tailHeight = newtail.block.Height()
 	delete(self.heightBlocks, newtail.block.Height())
+}
+func (self *snippetChain) remTail() *BlockForPool {
+	newTail := self.heightBlocks[self.tailHeight+1]
+	if newTail == nil {
+		return nil
+	}
+	self.deleteTail(newTail)
+	return newTail
 }
 
 func (self *snippetChain) merge(snippet *snippetChain) {
@@ -347,6 +358,18 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 		if tailHeight > c.headHeight {
 			continue
 		}
+		if snippet.headHeight <= c.headHeight {
+			continue
+		}
+		if sameChain(snippet, c) {
+			cutSnippet(snippet, c.headHeight)
+			if snippet.headHeight == snippet.tailHeight {
+				delete(self.snippetChains, snippet.id())
+				return false, false, nil
+			} else {
+				return false, true, c
+			}
+		}
 		point := findForkPoint(snippet, c, false)
 		if point != nil {
 			return true, false, c
@@ -367,6 +390,28 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 		return false, false, nil
 	}
 	return false, false, nil
+}
+func cutSnippet(snippet *snippetChain, height int) {
+	for {
+		tail := snippet.remTail()
+		if tail == nil {
+			return
+		}
+		if tail.block.Height() >= height {
+			return
+		}
+	}
+}
+
+// snippet.headHeight >=chain.headHeight
+func sameChain(snippet *snippetChain, chain heightChainReader) bool {
+	head := chain.Head()
+	b := snippet.heightBlocks[head.Height()]
+	if b != nil && b.block.Hash() == head.Hash() {
+		return true
+	} else {
+		return false
+	}
 }
 
 // snippet.tailHeight <= chain.headHeight
@@ -462,6 +507,7 @@ L:
 		result := stat.VerifyResult()
 		switch result {
 		case verifier.PENDING:
+
 		case verifier.FAIL:
 			log.Error("forkedChain forked. verify result is %s. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
@@ -816,6 +862,9 @@ func (self *BCPool) AddDirectBlock(block common.Block) error {
 		self.chainpool.insertChainFn(block, forkVersion)
 		head := self.chainpool.diskChain.Head()
 		self.chainpool.insertNotify(head)
+		if self.verifierSuccesscallback != nil {
+			self.verifierSuccesscallback(head, nil)
+		}
 		return nil
 	default:
 		return errors.New("add unexpected.")
@@ -851,15 +900,16 @@ func (self *BCPool) LoopFetchForSnippets() {
 	sortSnippets := copyMap(self.chainpool.snippetChains)
 	sort.Sort(ByTailHeight(sortSnippets))
 
+	//prev := self.chainpool.diskChain.Head().Height()
 	prev := -1
 	for _, w := range sortSnippets {
-		diff := 5
+		diff := 50
 		if prev > 0 {
 			diff = w.tailHeight - prev
 		}
 
 		if diff < 0 {
-			diff = 5
+			diff = 50
 		}
 
 		if diff > 1 {
@@ -869,9 +919,9 @@ func (self *BCPool) LoopFetchForSnippets() {
 		prev = w.headHeight
 	}
 }
-func (self *BCPool) CheckCurrentInsert(verifierFailcallback verifier.Callback, insertSuccessCallback verifier.Callback) {
-	self.chainpool.printChains()
-	self.chainpool.check(verifierFailcallback, insertSuccessCallback)
+func (self *BCPool) CheckCurrentInsert() {
+	//self.chainpool.printChains()
+	self.chainpool.check(self.verifierFailcallback, self.verifierSuccesscallback)
 }
 
 func (self *BCPool) whichChain(height int, hash string) *forkedChain {
@@ -1001,7 +1051,7 @@ func (self *BCPool) loop() {
 		self.LoopGenSnippetChains()
 		self.LoopAppendChains()
 		self.LoopFetchForSnippets()
-		self.CheckCurrentInsert(nil, nil)
+		self.CheckCurrentInsert()
 		time.Sleep(time.Second)
 	}
 }

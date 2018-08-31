@@ -173,8 +173,8 @@ func HexToAddress(hexStr string) Address {
 	return []byte(hexStr)
 }
 
-func (self *Address) String() string {
-	return string((*self)[:])
+func (self Address) String() string {
+	return string((self)[:])
 }
 
 func NewAccountBlock(

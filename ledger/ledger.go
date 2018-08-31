@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
@@ -15,14 +17,11 @@ import (
 )
 
 type Ledger interface {
-	face.SnapshotChainReader
-	face.AccountChainReader
-	// from other peer
-	AddSnapshotBlock(block *common.SnapshotBlock)
+	face.ChainRw
+	GetSnapshotBlocksByHeight(height int) *common.SnapshotBlock
+	GetAccountBlockByHeight(address string, height int) *common.AccountStateBlock
 	// from self
 	MiningSnapshotBlock(address string, timestamp int64) error
-	// from other peer
-	AddAccountBlock(account string, block *common.AccountStateBlock) error
 	// from self
 	//RequestAccountBlock(address string, block *common.AccountStateBlock) error
 	RequestAccountBlock(from string, to string, amount int) error
@@ -35,6 +34,8 @@ type Ledger interface {
 	Start()
 	Stop()
 	Init(syncer syncer.Syncer)
+	ListAccountBlock(address string) []*common.AccountStateBlock
+	ListSnapshotBlock() []*common.SnapshotBlock
 }
 
 type ledger struct {
@@ -57,9 +58,20 @@ func (self *ledger) GetAccountBlocksByHashH(address string, hashH common.HashHei
 	}
 	return ac.GetBlockByHashH(hashH)
 }
+func (self *ledger) GetAccountBlockByHeight(address string, height int) *common.AccountStateBlock {
+	ac := self.selfAc(address)
+	if ac == nil || ac.Head() == nil {
+		return nil
+	}
+	return ac.GetBlockByHeight(height)
+}
 
 func (self *ledger) GetSnapshotBlocksByHashH(hashH common.HashHeight) *common.SnapshotBlock {
 	return self.sc.GetBlockByHashH(hashH)
+}
+
+func (self *ledger) GetSnapshotBlocksByHeight(height int) *common.SnapshotBlock {
+	return self.sc.GetBlockHeight(height)
 }
 
 func (self *ledger) HeadAccount(address string) (*common.AccountStateBlock, error) {
@@ -93,7 +105,7 @@ func (self *ledger) GetAccountBalance(address string) int {
 }
 
 func (self *ledger) AddSnapshotBlock(block *common.SnapshotBlock) {
-	log.Info("snapshot block[%s] add.", block.Hash())
+	log.Info("snapshot block[%d][%s] add.", block.Height(), block.Hash())
 	self.pendingSc.AddBlock(block)
 }
 
@@ -126,7 +138,7 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 }
 
 func (self *ledger) AddAccountBlock(account string, block *common.AccountStateBlock) error {
-	log.Info("account[%s] block[%s] add.", block.Signer(), block.Hash())
+	log.Info("account[%s] block[%d][%s] add.", block.Signer(), block.Height(), block.Hash())
 	self.selfPendingAc(account).AddBlock(block)
 	return nil
 }
@@ -138,7 +150,11 @@ func (self *ledger) RequestAccountBlock(from string, to string, amount int) erro
 	newBlock := common.NewAccountBlockFrom(headAccount, from, time.Now(), amount, headSnaphost,
 		common.SEND, from, to, "")
 	newBlock.SetHash(tools.CalculateAccountHash(newBlock))
-	return self.selfPendingAc(from).AddDirectBlock(newBlock)
+	err := self.selfPendingAc(from).AddDirectBlock(newBlock)
+	if err == nil {
+		self.syncer.Sender().BroadcastAccountBlocks(from, []*common.AccountStateBlock{newBlock})
+	}
+	return err
 }
 func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string) error {
 	fromAc := self.selfAc(from)
@@ -162,7 +178,11 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 	modifiedAmount := -reqBlock.ModifiedAmount
 	block := common.NewAccountBlock(prev.Height()+1, "", prev.Hash(), to, time.Now(), prev.Amount+modifiedAmount, modifiedAmount, snapshostBlock.Height(), snapshostBlock.Hash(), common.RECEIVED, from, to, reqHash)
 	block.SetHash(tools.CalculateAccountHash(block))
-	return self.selfPendingAc(to).AddDirectBlock(block)
+	err := self.selfPendingAc(to).AddDirectBlock(block)
+	if err == nil {
+		self.syncer.Sender().BroadcastAccountBlocks(to, []*common.AccountStateBlock{block})
+	}
+	return err
 }
 
 func (self *ledger) selfAc(addr string) *AccountChain {
@@ -284,9 +304,29 @@ func addWaitRollback(hs map[string]*common.AccountHashH, h *common.AccountHashH)
 		return
 	}
 }
+func (self *ledger) PendingAccountTo(h *common.AccountHashH) error {
+	this := self.selfPendingAc(h.Addr)
+
+	inChain := this.FindInChain(h.Hash, h.Height)
+	bytes, _ := json.Marshal(h)
+	log.Info("inChain:%v, accounts:%s", inChain, string(bytes))
+	if !inChain {
+		self.syncer.Fetcher().FetchAccount(h.Addr, common.HashHeight{Hash: h.Hash, Height: h.Height}, 5)
+		return nil
+	}
+	return nil
+}
 
 func (self *ledger) ForkAccountTo(h *common.AccountHashH) error {
 	this := self.selfPendingAc(h.Addr)
+
+	inChain := this.FindInChain(h.Hash, h.Height)
+	bytes, _ := json.Marshal(h)
+	log.Info("inChain:%v, accounts:%s", inChain, string(bytes))
+	if !inChain {
+		self.syncer.Fetcher().FetchAccount(h.Addr, common.HashHeight{Hash: h.Hash, Height: h.Height}, 5)
+		return nil
+	}
 	ok, block, chain, err := this.FindRollbackPointForAccountHashH(h.Height, h.Hash)
 	if err != nil {
 		log.Error("%v", err)
@@ -378,6 +418,31 @@ func (self *ledger) GetByHFromChain(account string, height int) *common.AccountS
 func (self *ledger) ListRequest(address string) []*Req {
 	reqs := self.reqPool.getReqs(address)
 	return reqs
+}
+
+func (self *ledger) ListAccountBlock(address string) []*common.AccountStateBlock {
+	var blocks []*common.AccountStateBlock
+	ac := self.selfAc(address)
+	head := ac.Head()
+	for i := 0; i < head.Height(); i++ {
+		blocks = append(blocks, ac.GetBlockByHeight(i))
+	}
+	if head.Height() > 0 {
+		blocks = append(blocks, head.(*common.AccountStateBlock))
+	}
+	return blocks
+}
+func (self *ledger) ListSnapshotBlock() []*common.SnapshotBlock {
+	var blocks []*common.SnapshotBlock
+	ac := self.sc
+	head := ac.Head()
+	for i := 0; i < head.Height(); i++ {
+		blocks = append(blocks, ac.GetBlockHeight(i))
+	}
+	if head.Height() > 0 {
+		blocks = append(blocks, head.(*common.SnapshotBlock))
+	}
+	return blocks
 }
 func (self *ledger) GetReferred(account string, sourceHash string) *common.AccountStateBlock {
 	self.selfAc(account).GetBySourceBlock(sourceHash)

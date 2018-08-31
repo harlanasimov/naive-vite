@@ -28,6 +28,7 @@ type Node interface {
 
 func NewNode(cfg config.Node) Node {
 	self := &node{}
+	self.closed = make(chan struct{})
 	self.cfg = cfg
 	self.p2p = p2p.NewP2P(self.cfg.P2pCfg)
 	self.syncer = syncer.NewSyncer(self.p2p)
@@ -36,7 +37,11 @@ func NewNode(cfg config.Node) Node {
 	self.bus = EventBus.New()
 
 	if self.cfg.MinerCfg.Enabled {
-		self.miner = miner.NewMiner(self.ledger, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
+		if self.cfg.MinerCfg.CoinBase().String() == "" {
+			log.Error("coinBase must be set.")
+		} else {
+			self.miner = miner.NewMiner(self.ledger, self.syncer, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
+		}
 	}
 	return self
 }
@@ -98,7 +103,8 @@ func (self *node) Stop() {
 
 func (self *node) StartMiner() {
 	if self.miner == nil {
-		self.miner = miner.NewMiner(self.ledger, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
+		self.cfg.MinerCfg.HexCoinbase = self.wallet.CoinBase()
+		self.miner = miner.NewMiner(self.ledger, self.syncer, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
 		self.miner.Init()
 	}
 	self.miner.Start()

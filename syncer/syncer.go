@@ -17,6 +17,7 @@ type Syncer interface {
 	Handlers() Handlers
 	DefaultHandler() MsgHandler
 	Init(face.ChainRw)
+	Done() bool
 }
 
 //type snapshotChainReader interface {
@@ -92,4 +93,8 @@ func (self *syncer) Sender() Sender {
 
 func (self *syncer) Handlers() Handlers {
 	return self.receiver
+}
+
+func (self *syncer) Done() bool {
+	return true
 }

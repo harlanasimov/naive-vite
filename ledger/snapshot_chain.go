@@ -3,6 +3,8 @@ package ledger
 import (
 	"time"
 
+	"strconv"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 )
@@ -47,7 +49,20 @@ func (self *Snapshotchain) Head() common.Block {
 
 func (self *Snapshotchain) GetBlock(height int) common.Block {
 	if height < 0 {
-		log.Error("can't request height 0 block.[snapshotChain]")
+		panic("height:" + strconv.Itoa(height))
+		log.Error("can't request height 0 block.[snapshotChain]", height)
+		return nil
+	}
+	block, ok := self.snapshotHeightDB[height]
+	if !ok {
+		return nil
+	}
+	return block
+}
+func (self *Snapshotchain) GetBlockHeight(height int) *common.SnapshotBlock {
+	if height < 0 {
+		panic("height:" + strconv.Itoa(height))
+		log.Error("can't request height 0 block.[snapshotChain]", height)
 		return nil
 	}
 	block, ok := self.snapshotHeightDB[height]
@@ -59,7 +74,7 @@ func (self *Snapshotchain) GetBlock(height int) common.Block {
 
 func (self *Snapshotchain) GetBlockByHashH(hashH common.HashHeight) *common.SnapshotBlock {
 	if hashH.Height < 0 {
-		log.Error("can't request height 0 block.[snapshotChain]")
+		log.Error("can't request height 0 block.[snapshotChain]", hashH.Height)
 		return nil
 	}
 	block, ok := self.snapshotHeightDB[hashH.Height]
