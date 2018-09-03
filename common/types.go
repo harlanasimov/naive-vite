@@ -249,6 +249,8 @@ func NewAccountBlockFrom(
 type NetMsgType int
 
 const (
+	PeerConnected         NetMsgType = 1
+	PeerClosed            NetMsgType = 2
 	State                 NetMsgType = 101
 	RequestAccountHash    NetMsgType = 102
 	RequestSnapshotHash   NetMsgType = 103

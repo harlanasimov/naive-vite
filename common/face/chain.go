@@ -7,6 +7,8 @@ type ChainRw interface {
 	GetAccountBlocksByHashH(address string, hashH common.HashHeight) *common.AccountStateBlock
 	AddSnapshotBlock(block *common.SnapshotBlock)
 	AddAccountBlock(account string, block *common.AccountStateBlock) error
+	HeadSnapshost() (*common.SnapshotBlock, error)
+	GenesisSnapshost() (*common.SnapshotBlock, error)
 }
 
 type SyncStatus interface {
