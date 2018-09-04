@@ -22,6 +22,7 @@ type P2PLifecycle struct {
 type Peer interface {
 	Write(msg *Msg) error
 	Id() string
+	RemoteAddr() string
 	SetState(interface{})
 	GetState() interface{}
 }

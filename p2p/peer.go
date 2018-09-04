@@ -50,6 +50,10 @@ func (self *peer) Id() string {
 	return string(self.peerId)
 }
 
+func (self *peer) RemoteAddr() string {
+	return self.remoteAddr.String()
+}
+
 func (self *peer) close() {
 	self.once.Do(self.realClose)
 }

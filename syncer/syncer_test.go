@@ -24,6 +24,9 @@ func (self *TestPeer) SetState(state interface{}) {
 func (self *TestPeer) GetState() interface{} {
 	return self.state
 }
+func (self *TestPeer) RemoteAddr() string {
+	return ""
+}
 
 func (self *TestPeer) Write(msg *p2p.Msg) error {
 	log.Info("write msg, msgType:%s", msg.T)

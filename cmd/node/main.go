@@ -5,6 +5,8 @@ import (
 
 	"encoding/json"
 
+	"net"
+
 	"github.com/abiosoft/ishell"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/consensus"
@@ -101,18 +103,23 @@ func main() {
 				c.ShowPrompt(false)
 				defer c.ShowPrompt(true)
 
-				c.Print("BootAddr: ")
-				bootAddr := c.ReadLine()
-
-				if bootAddr == "" {
-					bootAddr = defaultBootAddr
-				}
-
 				c.Print("NodeId: ")
 				id := c.ReadLine()
 
-				c.Print("Port:")
+				c.Print("Port: ")
 				port, _ := strconv.Atoi(c.ReadLine())
+
+				c.Print("BootAddr: ")
+				bootAddr := c.ReadLine()
+
+				addr, e := net.ResolveTCPAddr("tcp4", bootAddr)
+
+				if bootAddr == "" || e != nil {
+					c.Printf("input boot address error, use default bootAddr[%s].\n", defaultBootAddr)
+					bootAddr = defaultBootAddr
+				} else {
+					bootAddr = addr.String()
+				}
 
 				node = startNode(bootAddr, port, id)
 				c.Println("node start for[" + bootAddr + "] successfully.")
@@ -130,6 +137,26 @@ func main() {
 				node.Stop()
 				node = nil
 				c.Println("node stop successfully.")
+			},
+		})
+
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "peers",
+			Help: "list peers for node.",
+			Func: func(c *ishell.Context) {
+				if node == nil {
+					c.Println("node must be started.")
+					return
+				}
+				net := node.P2P()
+				peers, _ := net.AllPeer()
+				c.Printf("-----net peers -----\n")
+				c.Println("Id\tRemote\tState")
+
+				for _, p := range peers {
+					bt, _ := json.Marshal(p.GetState())
+					c.Printf("%s\t%s\t%s\n", p.Id(), p.RemoteAddr(), string(bt))
+				}
 			},
 		})
 
@@ -482,7 +509,7 @@ func startBoot(bootAddr string) p2p.Boot {
 /**
 
 - boot[start,stop,list]
-- node[start,stop]
+- node[start,stop,peers]
 - miner[start,stop]
 
 

@@ -21,6 +21,7 @@ type Node interface {
 	StartMiner()
 	StopMiner()
 	Leger() ledger.Ledger
+	P2P() p2p.P2P
 	Wallet() wallet.Wallet
 }
 
@@ -117,4 +118,7 @@ func (self *node) Leger() ledger.Ledger {
 
 func (self *node) Wallet() wallet.Wallet {
 	return self.wallet
+}
+func (self *node) P2P() p2p.P2P {
+	return self.p2p
 }
