@@ -71,6 +71,7 @@ func (self *linker) loopWrite(conn *websocket.Conn) {
 	for {
 		select {
 		case <-self.closed:
+			conn.WriteMessage(websocket.CloseMessage, []byte{})
 			return
 		case <-ticker.C:
 			err := conn.WriteJSON(&bootReq{Tp: 1})

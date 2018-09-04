@@ -24,6 +24,7 @@ func NewSnapshotPool(name string) *SnapshotPool {
 	pool.Id = name
 	pool.verifierFailcallback = pool.insertSnapshotFailCallback
 	pool.verifierSuccesscallback = pool.insertSnapshotSuccessCallback
+	pool.closed = make(chan struct{})
 	return pool
 }
 

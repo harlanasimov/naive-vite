@@ -25,6 +25,12 @@ type Peer interface {
 	SetState(interface{})
 	GetState() interface{}
 }
+
+type BootLinkPeer struct {
+	Id   string
+	Addr string
+}
+
 type HandShaker interface {
 	GetState() (interface{}, error)
 	Handshake(peerId string, state []byte) error
@@ -75,6 +81,7 @@ type P2P interface {
 type Boot interface {
 	Start()
 	Stop()
+	All() []*BootLinkPeer
 }
 
 type p2p struct {

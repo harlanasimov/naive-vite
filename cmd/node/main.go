@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"strconv"
 
 	"encoding/json"
@@ -20,16 +18,7 @@ func main() {
 	shell := ishell.New()
 
 	// display welcome info.
-	shell.Println("Sample Interactive Shell")
-
-	// register a function for "greet" command.
-	shell.AddCmd(&ishell.Cmd{
-		Name: "greet",
-		Help: "greet user",
-		Func: func(c *ishell.Context) {
-			c.Println("Hello", strings.Join(c.Args, " "))
-		},
-	})
+	shell.Println("naive-vite Interactive Shell")
 
 	defaultBootAddr := "localhost:8000"
 	// subcommands and custom autocomplete.
@@ -71,6 +60,24 @@ func main() {
 				bootNode.Stop()
 				bootNode = nil
 				c.Println("boot stop successfully.")
+			},
+		})
+
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "list",
+			Help: "list linked node info.",
+			Func: func(c *ishell.Context) {
+				if bootNode == nil {
+					c.Println("boot should be started.")
+					return
+				}
+				all := bootNode.All()
+				c.Printf("-----boot links -----\n")
+				c.Println("Id\tAddr")
+
+				for _, p := range all {
+					c.Printf("%s\t%s\n", p.Id, p.Addr)
+				}
 			},
 		})
 
@@ -474,7 +481,7 @@ func startBoot(bootAddr string) p2p.Boot {
 
 /**
 
-- boot[start,stop]
+- boot[start,stop,list]
 - node[start,stop]
 - miner[start,stop]
 

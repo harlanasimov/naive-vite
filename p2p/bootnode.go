@@ -62,7 +62,7 @@ func (self *bootnode) loopread(peer *peer) {
 	self.wg.Add(1)
 	defer self.wg.Done()
 	conn := peer.conn
-	defer peer.close()
+	defer self.removePeer(peer)
 
 	for {
 		select {
@@ -82,7 +82,7 @@ func (self *bootnode) loopread(peer *peer) {
 				return
 			}
 			if req.Tp == 1 {
-				conn.WriteJSON(self.allPeer())
+				conn.WriteJSON(self.All())
 				continue
 			}
 		}
@@ -147,10 +147,10 @@ func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (self *bootnode) allPeer() []*bootLinkPeer {
-	var results []*bootLinkPeer
+func (self *bootnode) All() []*BootLinkPeer {
+	var results []*BootLinkPeer
 	for _, peer := range self.peers {
-		results = append(results, &bootLinkPeer{Id: peer.peerId, Addr: peer.peerSrvAddr})
+		results = append(results, &BootLinkPeer{Id: peer.peerId, Addr: peer.peerSrvAddr})
 	}
 	return results
 }
@@ -161,11 +161,6 @@ func (self *bootnode) Stop() {
 	self.server.Shutdown(context.Background())
 	close(self.closed)
 	self.wg.Wait()
-}
-
-type bootLinkPeer struct {
-	Id   string
-	Addr string
 }
 
 type bootReq struct {
