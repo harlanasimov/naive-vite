@@ -13,6 +13,33 @@ type sender struct {
 	net p2p.P2P
 }
 
+func (self *sender) broadcastState(s stateMsg) error {
+	bytM, err := json.Marshal(&s)
+	msg := p2p.NewMsg(common.State, bytM)
+
+	if err != nil {
+		return errors.New("broadcastState, format fail. err:" + err.Error())
+	}
+	peers, err := self.net.AllPeer()
+	if err != nil {
+		log.Error("broadcastState, can't get all peer.%v", err)
+		return err
+	}
+	if len(peers) == 0 {
+		//log.Info("broadcast peer list is empty.")
+		return nil
+	}
+
+	for _, p := range peers {
+		tmpE := p.Write(msg)
+		if tmpE != nil {
+			err = tmpE
+			log.Error("broadcastState, write data fail, peerId:%s, err:%v", p.Id(), err)
+		}
+	}
+	return err
+}
+
 func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.AccountStateBlock) error {
 	bytM, err := json.Marshal(&accountBlocksMsg{Address: address, Blocks: blocks})
 	msg := p2p.NewMsg(common.AccountBlocks, bytM)
@@ -24,6 +51,10 @@ func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.Acco
 	if err != nil {
 		log.Error("BroadcastAccountBlocks, can't get all peer.%v", err)
 		return err
+	}
+	if len(peers) == 0 {
+		//log.Info("broadcast peer list is empty.")
+		return nil
 	}
 
 	for _, p := range peers {
@@ -47,6 +78,10 @@ func (self *sender) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) erro
 	if err != nil {
 		log.Error("BroadcastSnapshotBlocks, can't get all peer.%v", err)
 		return err
+	}
+	if len(peers) == 0 {
+		log.Info("broadcast peer list is empty.")
+		return nil
 	}
 
 	for _, p := range peers {
@@ -147,6 +182,20 @@ func (self *sender) RequestSnapshotHash(height common.HashHeight, prevCnt int) e
 	err = peer.Write(msg)
 	if err != nil {
 		log.Error("sendSnapshotHash, write peer fail. peer:%s, err:%v", peer.Id(), err)
+	}
+	return err
+}
+
+func (self *sender) requestSnapshotBlockByPeer(height common.HashHeight, peer p2p.Peer) error {
+	m := requestSnapshotBlockMsg{Hashes: []common.HashHeight{height}}
+	bytM, err := json.Marshal(&m)
+	if err != nil {
+		return errors.New("requestSnapshotBlockByPeer, format fail. err:" + err.Error())
+	}
+	msg := p2p.NewMsg(common.RequestSnapshotBlocks, bytM)
+	err = peer.Write(msg)
+	if err != nil {
+		log.Error("requestSnapshotBlockByPeer, write peer fail. peer:%s, err:%v", peer.Id(), err)
 	}
 	return err
 }

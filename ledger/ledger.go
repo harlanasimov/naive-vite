@@ -28,7 +28,6 @@ type Ledger interface {
 	ResponseAccountBlock(from string, to string, reqHash string) error
 	// create account genesis block
 	HeadAccount(address string) (*common.AccountStateBlock, error)
-	HeadSnapshost() (*common.SnapshotBlock, error)
 	GetAccountBalance(address string) int
 	ListRequest(address string) []*Req
 	Start()
@@ -94,6 +93,10 @@ func (self *ledger) HeadSnapshost() (*common.SnapshotBlock, error) {
 	}
 	block := head.(*common.SnapshotBlock)
 	return block, nil
+}
+
+func (self *ledger) GenesisSnapshost() (*common.SnapshotBlock, error) {
+	return GetGenesisSnapshot(), nil
 }
 
 func (self *ledger) GetAccountBalance(address string) int {

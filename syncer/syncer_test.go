@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
@@ -65,6 +66,14 @@ func (self *TestP2P) AllPeer() ([]p2p.Peer, error) {
 type TestAccountReader struct {
 }
 
+func (self *TestAccountReader) GenesisSnapshost() (*common.SnapshotBlock, error) {
+	panic("implement me")
+}
+
+func (self *TestAccountReader) HeadSnapshost() (*common.SnapshotBlock, error) {
+	panic("implement me")
+}
+
 func (self *TestAccountReader) AddAccountBlock(account string, block *common.AccountStateBlock) error {
 	panic("implement me")
 }
@@ -88,7 +97,7 @@ func TestSyncer(t *testing.T) {
 	p := &TestP2P{}
 	accountReader := &TestAccountReader{}
 	p.bestPeer = peer
-	syncer := NewSyncer(p)
+	syncer := NewSyncer(p, EventBus.New())
 	syncer.Init(accountReader)
 	fetcher := syncer.Fetcher()
 	address := "viteshan"

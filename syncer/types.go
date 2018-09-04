@@ -4,6 +4,7 @@ import "github.com/viteshan/naive-vite/common"
 
 type stateMsg struct {
 	Height int
+	Hash   string
 }
 
 type accountBlocksMsg struct {
@@ -46,4 +47,5 @@ type requestSnapshotBlockMsg struct {
 
 type peerState struct {
 	Height int
+	Hash   string
 }

@@ -133,7 +133,7 @@ func (self *bootnode) ws(w http.ResponseWriter, r *http.Request) {
 		}
 		bytes, _ := json.Marshal(&req)
 		log.Info("upgrade success, add new peer. %s", string(bytes))
-		peer := newPeer(req.Id, self.id, req.Addr, c)
+		peer := newPeer(req.Id, self.id, req.Addr, c, nil)
 		closeHandler := c.CloseHandler()
 		c.SetCloseHandler(func(code int, text string) error {
 			self.removePeer(peer)

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/asaskevich/EventBus"
-	"github.com/vitelabs/go-vite/common/types"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
@@ -28,21 +27,21 @@ type DownloaderRegister func(chan<- int) // 0 represent success, not 0 represent
 */
 // 0:origin 1: initing 2:inited 3:starting 4:started 5:stopping 6:stopped 7:destroying 8:destroyed
 type MinerLifecycle struct {
-	types.LifecycleStatus
+	common.LifecycleStatus
 }
 
 func (self *MinerLifecycle) PreDestroy() bool {
-	return atomic.CompareAndSwapInt32(&self.Status, 6, 7)
+	return atomic.CompareAndSwapInt32(&self.S, 6, 7)
 }
 func (self *MinerLifecycle) PostDestroy() bool {
-	return atomic.CompareAndSwapInt32(&self.Status, 7, 8)
+	return atomic.CompareAndSwapInt32(&self.S, 7, 8)
 }
 
 func (self *MinerLifecycle) PreStart() bool {
-	return atomic.CompareAndSwapInt32(&self.Status, 2, 3) || atomic.CompareAndSwapInt32(&self.Status, 6, 3)
+	return atomic.CompareAndSwapInt32(&self.S, 2, 3) || atomic.CompareAndSwapInt32(&self.S, 6, 3)
 }
 func (self *MinerLifecycle) PostStart() bool {
-	return atomic.CompareAndSwapInt32(&self.Status, 3, 4)
+	return atomic.CompareAndSwapInt32(&self.S, 3, 4)
 }
 
 type Miner interface {

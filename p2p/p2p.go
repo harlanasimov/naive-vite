@@ -1,13 +1,11 @@
 package p2p
 
 import (
+	"encoding/json"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
-
-	"encoding/json"
-
-	"strconv"
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
@@ -16,11 +14,40 @@ import (
 	"github.com/viteshan/naive-vite/common/log"
 )
 
+// 0:origin 1: initing 2:inited 3:starting 4:started 5:stopping 6:stopped
+type P2PLifecycle struct {
+	common.LifecycleStatus
+}
+
 type Peer interface {
 	Write(msg *Msg) error
 	Id() string
 	SetState(interface{})
 	GetState() interface{}
+}
+type HandShaker interface {
+	GetState() (interface{}, error)
+	Handshake(peerId string, state []byte) error
+	DecodeState(state []byte) interface{}
+	EncodeState(state interface{}) []byte
+}
+type defaultHandShaker struct {
+}
+
+func (self *defaultHandShaker) GetState() (interface{}, error) {
+	return nil, nil
+}
+
+func (self *defaultHandShaker) Handshake(peerId string, state []byte) error {
+	return nil
+}
+
+func (self *defaultHandShaker) DecodeState(state []byte) interface{} {
+	return nil
+}
+
+func (self *defaultHandShaker) EncodeState(state interface{}) []byte {
+	return nil
 }
 
 type Msg struct {
@@ -38,6 +65,8 @@ type P2P interface {
 	BestPeer() (Peer, error)
 	AllPeer() ([]Peer, error)
 	SetHandlerFn(MsgHandle)
+	SetHandShaker(HandShaker)
+	Init()
 	Start()
 	Stop()
 	Id() string
@@ -49,15 +78,20 @@ type Boot interface {
 }
 
 type p2p struct {
+	P2PLifecycle
 	//peers  []*peer
-	mu           sync.Mutex
-	server       *server
-	dial         *dial
-	linker       *linker
-	boot         *bootnode
+	mu     sync.Mutex
+	server *server
+	dial   *dial
+	linker *linker
+	boot   *bootnode
+	hs     *handShaker
+	bizHs  HandShaker
+
 	peers        map[string]*peer
 	pendingDials map[string]string
 	id           string
+	netId        int
 	addr         string
 	linkBootAddr string
 	closed       chan struct{}
@@ -66,7 +100,7 @@ type p2p struct {
 }
 
 func NewP2P(config config.P2P) P2P {
-	p2p := &p2p{id: config.NodeId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr}
+	p2p := &p2p{id: config.NodeId, netId: config.NetId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr}
 	return p2p
 }
 
@@ -90,11 +124,20 @@ func (self *p2p) AllPeer() ([]Peer, error) {
 	if len(result) > 0 {
 		return result, nil
 	}
-	return nil, errors.New("can't find best peer.")
+	return nil, nil
 }
 
 func (self *p2p) SetHandlerFn(handler MsgHandle) {
+	if self.Status() >= common.PreStart {
+		panic("p2p has started, could not set handleFn.")
+	}
 	self.msgHandleFn = handler
+}
+func (self *p2p) SetHandShaker(hs HandShaker) {
+	if self.Status() >= common.PreInit {
+		panic("p2p has started, could not set HandShaker.")
+	}
+	self.bizHs = hs
 }
 
 func (self *p2p) addPeer(peer *peer) {
@@ -115,6 +158,10 @@ func (self *p2p) loopPeer(peer *peer) {
 	conn := peer.conn
 	defer peer.close()
 	defer delete(self.peers, peer.peerId)
+	if self.msgHandleFn != nil {
+		self.msgHandleFn(common.PeerConnected, nil, peer)
+		defer self.msgHandleFn(common.PeerClosed, nil, peer)
+	}
 	for {
 		select {
 		case <-self.closed:
@@ -157,12 +204,20 @@ func (self *p2p) allPeers() map[string]*peer {
 	return result
 }
 
-func (self *p2p) Start() {
+func (self *p2p) Init() {
+	defer self.PreInit().PostInit()
 	self.pendingDials = make(map[string]string)
 	self.peers = make(map[string]*peer)
-	self.dial = &dial{p2p: self}
-	self.server = &server{id: self.id, addr: self.addr, bootAddr: self.linkBootAddr, p2p: self}
+	if self.bizHs == nil {
+		self.bizHs = &defaultHandShaker{}
+	}
+	self.hs = &handShaker{self, self.bizHs}
+	self.dial = &dial{p2p: self, hs: self.hs}
+	self.server = &server{id: self.id, addr: self.addr, bootAddr: self.linkBootAddr, p2p: self, hs: self.hs}
 	self.linker = newLinker(self, url.URL{Scheme: "ws", Host: self.linkBootAddr, Path: "/ws"})
+}
+func (self *p2p) Start() {
+	defer self.PreStart().PostStart()
 	self.server.start()
 	self.linker.start()
 	go self.loop()
@@ -199,6 +254,7 @@ func (self *p2p) loop() {
 }
 
 func (self *p2p) Stop() {
+	defer self.PreStop().PostStop()
 	self.linker.stop()
 	for _, v := range self.peers {
 		v.stop()

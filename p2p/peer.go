@@ -87,10 +87,10 @@ func (self *peer) stop() {
 	self.loopWg.Wait()
 }
 
-func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Conn) *peer {
+func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Conn, s interface{}) *peer {
 	c := conn.CloseHandler()
 	remoteAddr := conn.RemoteAddr()
-	peer := &peer{peerId: fromId, selfId: toId, peerSrvAddr: peerSrvAddr, conn: conn, remoteAddr: remoteAddr}
+	peer := &peer{peerId: fromId, selfId: toId, peerSrvAddr: peerSrvAddr, conn: conn, remoteAddr: remoteAddr, state: s}
 	peer.closed = make(chan struct{})
 	conn.SetCloseHandler(func(code int, text string) error {
 		log.Info("peer received closed msg. %s, %v", peer.info(), remoteAddr)

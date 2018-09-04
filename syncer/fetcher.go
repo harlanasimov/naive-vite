@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/p2p"
 )
 
 type retryPolicy interface {
@@ -84,9 +85,15 @@ func (self *defaultRetryPolicy) newRetryStatus() *RetryStatus {
 }
 
 type fetcher struct {
-	sender Sender
+	sender *sender
 
 	retryPolicy retryPolicy
+}
+
+func (self *fetcher) fetchSnapshotBlockFromPeer(hash common.HashHeight, peer p2p.Peer) {
+	if self.retryPolicy.retry(hash.Hash) {
+		self.sender.requestSnapshotBlockByPeer(hash, peer)
+	}
 }
 
 func (self *fetcher) FetchAccount(address string, hash common.HashHeight, prevCnt int) {

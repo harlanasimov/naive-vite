@@ -10,9 +10,11 @@ import (
 )
 
 type server struct {
-	id       string
-	addr     string
-	p2p      *p2p
+	id   string
+	addr string
+	p2p  *p2p
+	hs   *handShaker
+
 	bootAddr string
 	srv      *http.Server
 }
@@ -22,11 +24,13 @@ var upgrader = websocket.Upgrader{} // use default options
 func (self *server) ws(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err == nil {
-		c.WriteJSON(bootReq{Id: self.p2p.id, Addr: self.p2p.addr})
-		req := bootReq{}
-		c.ReadJSON(&req)
-		log.Info("upgrade success, add new peer.%v", req)
-		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))
+		peer, err := self.hs.handshake(c)
+		if err == nil {
+			log.Info("client connect success, add new peer. %v", peer.peerId)
+			self.p2p.addPeer(peer)
+		} else {
+			log.Error("client connect success, but handshake fail. err:%v", err)
+		}
 	} else {
 		log.Error("upgrade error.", err)
 	}
@@ -50,17 +54,20 @@ func (self *server) stop() {
 
 type dial struct {
 	p2p *p2p
+	hs  *handShaker
 }
 
 func (self *dial) connect(addr string) bool {
 	u := url.URL{Scheme: "ws", Host: addr, Path: "/ws"}
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err == nil {
-		c.WriteJSON(bootReq{Id: self.p2p.id, Addr: self.p2p.addr})
-		req := bootReq{}
-		c.ReadJSON(&req)
-		log.Info("client connect success, add new peer.%v", req)
-		self.p2p.addPeer(newPeer(req.Id, self.p2p.id, req.Addr, c))
+		peer, err := self.hs.handshake(c)
+		if err == nil {
+			log.Info("client connect success, add new peer. %v", peer.peerId)
+			self.p2p.addPeer(peer)
+		} else {
+			log.Error("client connect success, but handshake fail. err:%v", err)
+		}
 		return true
 	} else {
 		log.Error("dial error.", err, addr)

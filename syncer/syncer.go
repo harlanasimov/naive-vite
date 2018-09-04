@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/p2p"
@@ -17,6 +18,8 @@ type Syncer interface {
 	Handlers() Handlers
 	DefaultHandler() MsgHandler
 	Init(face.ChainRw)
+	Start()
+	Stop()
 	Done() bool
 }
 
@@ -65,22 +68,34 @@ type syncer struct {
 	fetcher  *fetcher
 	receiver *receiver
 	p2p      p2p.P2P
+	state    *state
+
+	bus EventBus.Bus
 }
 
 func (self *syncer) DefaultHandler() MsgHandler {
 	return self.receiver
 }
 
-func NewSyncer(net p2p.P2P) Syncer {
-	self := &syncer{}
+func NewSyncer(net p2p.P2P, bus EventBus.Bus) Syncer {
+	self := &syncer{bus: bus}
 	self.sender = &sender{net: net}
 	self.p2p = net
+	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
 	return self
 }
 func (self *syncer) Init(rw face.ChainRw) {
-	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
-	self.receiver = newReceiver(self.fetcher, rw, self.sender)
+	self.state = newState(rw, self.fetcher, self.sender, self.p2p, self.bus)
+	self.receiver = newReceiver(self.fetcher, rw, self.sender, self.state)
 	self.p2p.SetHandlerFn(self.DefaultHandler().Handle)
+	self.p2p.SetHandShaker(self.state)
+}
+
+func (self *syncer) Start() {
+	self.state.start()
+}
+func (self *syncer) Stop() {
+	self.state.stop()
 }
 
 func (self *syncer) Fetcher() Fetcher {
@@ -96,5 +111,5 @@ func (self *syncer) Handlers() Handlers {
 }
 
 func (self *syncer) Done() bool {
-	return true
+	return self.state.syncDone()
 }

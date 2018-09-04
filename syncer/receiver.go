@@ -23,7 +23,7 @@ func (self *receiver) Id() string {
 	return "default-handler"
 }
 
-func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender) *receiver {
+func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender, s *state) *receiver {
 	self := &receiver{}
 	self.fetcher = fetcher
 	tmpInnerHandlers := make(map[common.NetMsgType][]MsgHandler)
@@ -33,7 +33,7 @@ func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender) *receiver {
 	innerhandlers = append(innerhandlers, &snapshotHashHandler{fetcher: fetcher})
 	innerhandlers = append(innerhandlers, &snapshotBlocksHandler{sWriter: rw, fetcher: fetcher})
 	innerhandlers = append(innerhandlers, &accountBlocksHandler{aWriter: rw, fetcher: fetcher})
-	innerhandlers = append(innerhandlers, &stateHandler{})
+	innerhandlers = append(innerhandlers, &stateHandler{state: s})
 	innerhandlers = append(innerhandlers, &reqAccountHashHandler{aReader: rw, sender: sender})
 	innerhandlers = append(innerhandlers, &reqSnapshotHashHandler{sReader: rw, sender: sender})
 	innerhandlers = append(innerhandlers, &reqAccountBlocksHandler{aReader: rw, sender: sender})
@@ -54,10 +54,11 @@ func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender) *receiver {
 
 type stateHandler struct {
 	MsgHandler
+	state *state
 }
 
 func (self *stateHandler) Types() []common.NetMsgType {
-	return []common.NetMsgType{common.State}
+	return []common.NetMsgType{common.State, common.PeerConnected, common.PeerClosed}
 }
 
 func (self *stateHandler) Id() string {
@@ -65,20 +66,30 @@ func (self *stateHandler) Id() string {
 }
 
 func (self *stateHandler) Handle(t common.NetMsgType, msg []byte, peer p2p.Peer) {
-	stateMsg := &stateMsg{}
+	switch t {
+	case common.PeerClosed:
+		self.state.peerClosed(peer)
+	case common.PeerConnected:
+		self.state.peerConnected(peer)
+	case common.State:
+		stateMsg := &stateMsg{}
 
-	err := json.Unmarshal(msg, stateMsg)
-	if err != nil {
-		log.Error("stateHandler.Handle unmarshal fail.")
-		return
+		err := json.Unmarshal(msg, stateMsg)
+		if err != nil {
+			log.Error("stateHandler.Handle unmarshal fail.")
+			return
+		}
+
+		self.state.update(stateMsg, peer)
 	}
-	prevState := peer.GetState()
-	if prevState == nil {
-		peer.SetState(&peerState{Height: stateMsg.Height})
-	} else {
-		state := prevState.(*peerState)
-		state.Height = stateMsg.Height
-	}
+
+	//prevState := peer.GetState()
+	//if prevState == nil {
+	//	peer.SetState(&peerState{Height: stateMsg.Height})
+	//} else {
+	//	state := prevState.(*peerState)
+	//	state.Height = stateMsg.Height
+	//}
 }
 
 type snapshotHashHandler struct {

@@ -2,10 +2,8 @@ package node
 
 import (
 	"sync"
-	"time"
 
 	"github.com/asaskevich/EventBus"
-	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
@@ -28,13 +26,13 @@ type Node interface {
 
 func NewNode(cfg config.Node) Node {
 	self := &node{}
+	self.bus = EventBus.New()
 	self.closed = make(chan struct{})
 	self.cfg = cfg
 	self.p2p = p2p.NewP2P(self.cfg.P2pCfg)
-	self.syncer = syncer.NewSyncer(self.p2p)
+	self.syncer = syncer.NewSyncer(self.p2p, self.bus)
 	self.ledger = ledger.NewLedger()
 	self.consensus = consensus.NewConsensus(ledger.GetGenesisSnapshot().Timestamp(), self.cfg.ConsensusCfg)
-	self.bus = EventBus.New()
 
 	if self.cfg.MinerCfg.Enabled {
 		if self.cfg.MinerCfg.CoinBase().String() == "" {
@@ -64,7 +62,7 @@ func (self *node) Init() {
 	self.syncer.Init(self.ledger)
 	self.ledger.Init(self.syncer)
 	self.consensus.Init()
-
+	self.p2p.Init()
 	if self.miner != nil {
 		self.miner.Init()
 	}
@@ -74,15 +72,11 @@ func (self *node) Init() {
 func (self *node) Start() {
 	self.p2p.Start()
 	self.ledger.Start()
+	self.syncer.Start()
 	self.consensus.Start()
 
 	if self.miner != nil {
 		self.miner.Start()
-	}
-
-	select {
-	case <-time.After(2 * time.Second):
-		self.bus.Publish(common.DwlDone)
 	}
 
 	log.Info("node started...")
@@ -95,6 +89,7 @@ func (self *node) Stop() {
 		self.miner.Stop()
 	}
 	self.consensus.Stop()
+	self.syncer.Stop()
 	self.ledger.Stop()
 	self.p2p.Stop()
 	self.wg.Wait()
