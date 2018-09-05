@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	chain2 "github.com/viteshan/naive-vite/chain"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/test"
@@ -145,7 +146,8 @@ func TestBcPool(t *testing.T) {
 	testSyncer.genLinkedData()
 	pool := newBlockChainPool("bcPool-1")
 	testSyncer.pool = pool
-	pool.init(reader.insertChain, reader.removeChain, &TestVerifier{}, NewFetcher("", testSyncer), reader)
+
+	pool.init(&accountCh{address: "viteshan2", bc: chain2.NewChain()}, &TestVerifier{}, NewFetcher("", testSyncer))
 	go pool.loop()
 	pool.AddBlock(&test.TestBlock{Thash: "A-6", Theight: 6, TpreHash: "A-5", Tsigner: signer, Ttimestamp: time.Now()})
 	time.Sleep(time.Second)

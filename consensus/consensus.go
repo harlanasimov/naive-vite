@@ -21,11 +21,11 @@ type Seal interface {
 }
 
 type AccountsConsensus interface {
-	ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *common.SnapshotBlock) error
-	ForkAccountTo(h *common.AccountHashH) error
-	SnapshotAccount(block *common.SnapshotBlock, h *common.AccountHashH)
-	UnLockAccounts(startAcs map[string]*common.SnapshotPoint, endAcs map[string]*common.SnapshotPoint) error
-	PendingAccountTo(h *common.AccountHashH) error
+	//ForkAccounts(keyPoint *common.SnapshotBlock, forkPoint *common.SnapshotBlock) error
+	//ForkAccountTo(h *common.AccountHashH) error
+	//SnapshotAccount(block *common.SnapshotBlock, h *common.AccountHashH)
+	//UnLockAccounts(startAcs map[string]*common.SnapshotPoint, endAcs map[string]*common.SnapshotPoint) error
+	//PendingAccountTo(h *common.AccountHashH) error
 }
 
 type Consensus interface {

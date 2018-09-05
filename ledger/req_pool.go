@@ -16,6 +16,22 @@ type reqPool struct {
 	accounts map[string]*reqAccountPool
 }
 
+func (self *reqPool) SnapshotInsertCallback(block *common.SnapshotBlock) {
+
+}
+
+func (self *reqPool) SnapshotRemoveCallback(block *common.SnapshotBlock) {
+
+}
+
+func (self *reqPool) AccountInsertCallback(address string, block *common.AccountStateBlock) {
+	self.blockInsert(block)
+}
+
+func (self *reqPool) AccountRemoveCallback(address string, block *common.AccountStateBlock) {
+	self.blockRollback(block)
+}
+
 type reqAccountPool struct {
 	reqs map[string]*Req
 }

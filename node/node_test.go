@@ -71,3 +71,45 @@ func TestNode_Start(t *testing.T) {
 	n.Start()
 	time.Sleep(200 * time.Second)
 }
+
+func TestSendReceived(t *testing.T) {
+	defaultBoot := "localhost:8000"
+	boot := startBoot(defaultBoot)
+	n := startNode(defaultBoot, 8091, "1")
+	time.Sleep(time.Second)
+	balance := n.Leger().GetAccountBalance("jie")
+	if balance != 200 {
+		t.Error("balance is wrong.", balance, 200)
+	}
+	err := n.Leger().RequestAccountBlock("jie", "jie2", -20)
+	if err != nil {
+		t.Error("send tx error.", err)
+	}
+	balance = n.Leger().GetAccountBalance("jie")
+	if balance != 180 {
+		t.Error("balance is wrong.", balance, 180)
+	}
+	reqs := n.Leger().ListRequest("jie2")
+	if len(reqs) != 1 {
+		t.Error("reqs size is wrong.", reqs)
+		return
+	}
+	req := reqs[0]
+	err = n.Leger().ResponseAccountBlock("jie", "jie2", req.ReqHash)
+	if err != nil {
+		t.Error("response error.", err, req.ReqHash)
+	}
+	n.Stop()
+	boot.Stop()
+}
+
+func startNode(bootAddr string, port int, nodeId string) Node {
+	cfg := config.Node{
+		P2pCfg:       config.P2P{NodeId: nodeId, Port: port, LinkBootAddr: bootAddr, NetId: 0},
+		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+	}
+	n := NewNode(cfg)
+	n.Init()
+	n.Start()
+	return n
+}

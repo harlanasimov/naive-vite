@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/viteshan/naive-vite/common"
-	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
@@ -23,7 +22,7 @@ func (self *receiver) Id() string {
 	return "default-handler"
 }
 
-func newReceiver(fetcher *fetcher, rw face.ChainRw, sender Sender, s *state) *receiver {
+func newReceiver(fetcher *fetcher, rw *chainRw, sender Sender, s *state) *receiver {
 	self := &receiver{}
 	self.fetcher = fetcher
 	tmpInnerHandlers := make(map[common.NetMsgType][]MsgHandler)
@@ -139,7 +138,7 @@ func (self *accountHashHandler) Id() string {
 type snapshotBlocksHandler struct {
 	MsgHandler
 	fetcher *fetcher
-	sWriter face.ChainRw
+	sWriter *chainRw
 }
 
 func (self *snapshotBlocksHandler) Types() []common.NetMsgType {
@@ -164,7 +163,7 @@ func (self *snapshotBlocksHandler) Id() string {
 type accountBlocksHandler struct {
 	MsgHandler
 	fetcher *fetcher
-	aWriter face.ChainRw
+	aWriter *chainRw
 }
 
 func (self *accountBlocksHandler) Types() []common.NetMsgType {

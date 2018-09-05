@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 
 	"github.com/viteshan/naive-vite/common"
-	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
 type reqAccountHashHandler struct {
 	MsgHandler
-	aReader face.ChainRw
+	aReader *chainRw
 	sender  Sender
 }
 
@@ -33,7 +32,7 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 		if i < 0 {
 			break
 		}
-		block := self.aReader.GetAccountBlocksByHashH(msg.Address, hashH)
+		block := self.aReader.GetAccountByHashH(msg.Address, hashH)
 		if block == nil {
 			break
 		}
@@ -53,7 +52,7 @@ func (self *reqAccountHashHandler) Id() string {
 
 type reqSnapshotHashHandler struct {
 	MsgHandler
-	sReader face.ChainRw
+	sReader *chainRw
 	sender  Sender
 }
 
@@ -76,7 +75,7 @@ func (self *reqSnapshotHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.
 		if i < 0 {
 			break
 		}
-		block := self.sReader.GetSnapshotBlocksByHashH(hashH)
+		block := self.sReader.GetSnapshotByHashH(hashH)
 		if block == nil {
 			break
 		}
@@ -96,7 +95,7 @@ func (self *reqSnapshotHashHandler) Id() string {
 
 type reqAccountBlocksHandler struct {
 	MsgHandler
-	aReader face.ChainRw
+	aReader *chainRw
 	sender  Sender
 }
 
@@ -117,7 +116,7 @@ func (self *reqAccountBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2p
 	}
 	var blocks []*common.AccountStateBlock
 	for _, v := range hashes {
-		block := self.aReader.GetAccountBlocksByHashH(msg.Address, v)
+		block := self.aReader.GetAccountByHashH(msg.Address, v)
 		if block == nil {
 			continue
 		}
@@ -134,7 +133,7 @@ func (*reqAccountBlocksHandler) Id() string {
 
 type reqSnapshotBlocksHandler struct {
 	MsgHandler
-	sReader face.ChainRw
+	sReader *chainRw
 	sender  Sender
 }
 
@@ -155,7 +154,7 @@ func (self *reqSnapshotBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2
 	}
 	var blocks []*common.SnapshotBlock
 	for _, v := range hashes {
-		block := self.sReader.GetSnapshotBlocksByHashH(v)
+		block := self.sReader.GetSnapshotByHashH(v)
 		if block == nil {
 			continue
 		}

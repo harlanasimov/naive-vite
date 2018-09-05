@@ -17,10 +17,14 @@ type Syncer interface {
 	Sender() Sender
 	Handlers() Handlers
 	DefaultHandler() MsgHandler
-	Init(face.ChainRw)
+	Init(reader face.ChainReader, writer face.PoolWriter)
 	Start()
 	Stop()
 	Done() bool
+}
+type chainRw struct {
+	face.ChainReader
+	face.PoolWriter
 }
 
 //type snapshotChainReader interface {
@@ -84,7 +88,8 @@ func NewSyncer(net p2p.P2P, bus EventBus.Bus) Syncer {
 	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
 	return self
 }
-func (self *syncer) Init(rw face.ChainRw) {
+func (self *syncer) Init(reader face.ChainReader, writer face.PoolWriter) {
+	rw := &chainRw{ChainReader: reader, PoolWriter: writer}
 	self.state = newState(rw, self.fetcher, self.sender, self.p2p, self.bus)
 	self.receiver = newReceiver(self.fetcher, rw, self.sender, self.state)
 	self.p2p.SetHandlerFn(self.DefaultHandler().Handle)

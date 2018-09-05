@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 )
 
 type VerifyResult int
@@ -39,14 +40,11 @@ type BlockVerifyStat interface {
 }
 
 type SnapshotVerifier struct {
-	snapshotReader SnapshotReader
-	accountReader  AccountReader
+	reader face.ChainReader
 }
 
-func NewSnapshotVerifier(snapshotReader SnapshotReader, accountReader AccountReader) *SnapshotVerifier {
-	verifier := &SnapshotVerifier{}
-	verifier.snapshotReader = snapshotReader
-	verifier.accountReader = accountReader
+func NewSnapshotVerifier(r face.ChainReader) *SnapshotVerifier {
+	verifier := &SnapshotVerifier{reader: r}
 	return verifier
 }
 
@@ -72,7 +70,7 @@ func (self *SnapshotVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) 
 		addr := v.Addr
 		hash := v.Hash
 		height := v.Height
-		block := self.accountReader.GetByHFromChain(addr, height)
+		block := self.reader.GetAccountByHeight(addr, height)
 		if block == nil {
 			stat.results[v.Addr] = PENDING
 		} else {
@@ -120,38 +118,40 @@ func (self *SnapshotVerifier) NewVerifyStat(t VerifyType, b common.Block) BlockV
 }
 
 type AccountVerifier struct {
-	snapshotReader SnapshotReader
-	accountReader  AccountReader
+	reader face.ChainReader
 }
 
-func NewAccountVerifier(snapshotReader SnapshotReader, accountReader AccountReader) *AccountVerifier {
-	verifier := &AccountVerifier{}
-	verifier.snapshotReader = snapshotReader
-	verifier.accountReader = accountReader
+func NewAccountVerifier(r face.ChainReader) *AccountVerifier {
+	verifier := &AccountVerifier{reader: r}
 	return verifier
-}
-
-type SnapshotReader interface {
-	Contains(height int, hash string) bool
-}
-
-type AccountReader interface {
-	GetFromChain(account string, hash string) *common.AccountStateBlock
-	GetByHFromChain(account string, height int) *common.AccountStateBlock
-	GetReferred(account string, sourceHash string) *common.AccountStateBlock
 }
 
 func (self *AccountVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) {
 	block := b.(*common.AccountStateBlock)
 	stat := s.(*AccountBlockVerifyStat)
 
+	// genesis account block
+	if block.BlockType == common.GENESIS {
+		genesis, _ := self.reader.GenesisSnapshot()
+		for _, a := range genesis.Accounts {
+			if a.Hash == block.Hash() && a.Height == block.Height() {
+				stat.referredFromResult = SUCCESS
+				stat.referredSelfResult = SUCCESS
+				stat.referredSnapshotResult = SUCCESS
+				return
+			}
+		}
+		stat.referredSelfResult = FAIL
+		return
+	}
+
 	// referred snapshot
 	snapshotHeight := block.SnapshotHeight
 	snapshotHash := block.SnapshotHash
 
 	if !stat.referredSnapshotResult.Done() {
-		snapshotR := self.snapshotReader.Contains(snapshotHeight, snapshotHash)
-		if snapshotR {
+		snapshotR := self.reader.GetSnapshotByHashH(common.HashHeight{Hash: snapshotHash, Height: snapshotHeight})
+		if snapshotR != nil {
 			stat.referredSnapshotResult = SUCCESS
 		} else {
 			stat.referredSnapshotResult = PENDING
@@ -160,17 +160,28 @@ func (self *AccountVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) {
 
 	// self amount and response
 	if !stat.referredSelfResult.Done() {
-		if block.BlockType == common.RECEIVED {
-			same := self.accountReader.GetReferred(block.To, block.SourceHash)
-			if same != nil {
-				stat.referredSelfResult = FAIL
+		if block.BlockType == common.RECEIVED && block.Height() == 0 {
+			// check genesis block logic
+			genesisCheck := self.checkGenesis(block)
+			stat.referredSelfResult = genesisCheck
+			if genesisCheck == FAIL {
 				return
 			}
-		}
-		selfAmount := self.checkSelfAmount(block)
-		stat.referredSelfResult = selfAmount
-		if selfAmount == FAIL {
-			return
+
+		} else {
+			if block.BlockType == common.RECEIVED {
+				//check if it has been received
+				same := self.reader.GetAccountBySourceHash(block.To, block.SourceHash)
+				if same != nil {
+					stat.referredSelfResult = FAIL
+					return
+				}
+			}
+			selfAmount := self.checkSelfAmount(block)
+			stat.referredSelfResult = selfAmount
+			if selfAmount == FAIL {
+				return
+			}
 		}
 	}
 	// from amount
@@ -218,7 +229,7 @@ func (self *AccountVerifier) NewVerifyStat(t VerifyType, block common.Block) Blo
 	return &AccountBlockVerifyStat{}
 }
 func (self *AccountVerifier) checkSelfAmount(block *common.AccountStateBlock) VerifyResult {
-	last := self.accountReader.GetByHFromChain(block.Signer(), block.Height()-1)
+	last := self.reader.GetAccountByHeight(block.Signer(), block.Height()-1)
 
 	if last == nil {
 		return PENDING
@@ -244,8 +255,20 @@ func (self *AccountVerifier) checkSelfAmount(block *common.AccountStateBlock) Ve
 		return FAIL
 	}
 }
+
+func (self *AccountVerifier) checkGenesis(block *common.AccountStateBlock) VerifyResult {
+	head, _ := self.reader.HeadAccount(block.Signer())
+	if head != nil {
+		return FAIL
+	}
+	if block.PreHash() != "" || block.ModifiedAmount != block.Amount {
+		return FAIL
+	}
+	return SUCCESS
+}
+
 func (self *AccountVerifier) checkFromAmount(block *common.AccountStateBlock) VerifyResult {
-	source := self.accountReader.GetFromChain(block.From, block.SourceHash)
+	source := self.reader.GetAccountByHash(block.From, block.SourceHash)
 	if source == nil {
 		return PENDING
 	}

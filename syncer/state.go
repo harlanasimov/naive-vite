@@ -10,7 +10,6 @@ import (
 	"github.com/asaskevich/EventBus"
 	"github.com/pkg/errors"
 	"github.com/viteshan/naive-vite/common"
-	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
@@ -28,7 +27,7 @@ type syncTask struct {
 }
 
 type state struct {
-	rw      face.ChainRw
+	rw      *chainRw
 	peers   map[string]*syncPeer
 	fetcher *fetcher
 	sender  *sender
@@ -70,12 +69,12 @@ func (self *state) Handshake(peerId string, state []byte) error {
 }
 
 func (self *state) getHandState() (*handState, error) {
-	head, e := self.rw.HeadSnapshost()
+	head, e := self.rw.HeadSnapshot()
 	if e != nil {
 		return nil, errors.New("get snapshot head block fail.")
 
 	}
-	genesis, e := self.rw.GenesisSnapshost()
+	genesis, e := self.rw.GenesisSnapshot()
 	if e != nil {
 		return nil, errors.New("get genesis block fail.")
 	}
@@ -108,7 +107,7 @@ func (self *state) EncodeState(state interface{}) []byte {
 	return b
 }
 
-func newState(rw face.ChainRw, fetcher *fetcher, s *sender, p p2p.P2P, bus EventBus.Bus) *state {
+func newState(rw *chainRw, fetcher *fetcher, s *sender, p p2p.P2P, bus EventBus.Bus) *state {
 	self := &state{}
 	self.rw = rw
 	self.peers = make(map[string]*syncPeer)
@@ -138,7 +137,7 @@ func (self *state) update(msg *stateMsg, peer p2p.Peer) {
 		state := prevState.(*handState)
 		state.S.Height = msg.Height
 	}
-	head, e := self.rw.HeadSnapshost()
+	head, e := self.rw.HeadSnapshot()
 	if e != nil {
 		log.Error("read snapshot head error:%v", e)
 		return
@@ -167,7 +166,7 @@ func (self *state) loop() {
 		case <-self.closed:
 			return
 		case <-ticker.C:
-			head, e := self.rw.HeadSnapshost()
+			head, e := self.rw.HeadSnapshot()
 			if e != nil {
 				log.Error("read snapshot head error:%v", e)
 				continue
@@ -222,7 +221,7 @@ NET:
 		}
 	}
 
-	head, e := self.rw.HeadSnapshost()
+	head, e := self.rw.HeadSnapshot()
 	if e != nil {
 		log.Error("read snapshot head error:%v", e)
 		return
@@ -242,7 +241,7 @@ NET:
 		case <-ta.closed:
 			return
 		case <-t.C:
-			head, e := self.rw.HeadSnapshost()
+			head, e := self.rw.HeadSnapshot()
 			if e != nil {
 				log.Error("read snapshot head error:%v", e)
 				continue

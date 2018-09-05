@@ -395,9 +395,14 @@ func main() {
 					addr = c.Args[0]
 				}
 
-				head, _ := node.Leger().HeadAccount(addr)
+				head, _ := node.Leger().Chain().HeadAccount(addr)
 
-				c.Printf("head info, height:%d, hash:%s, prev:%s\n", head.Height(), head.Hash(), head.PreHash())
+				if head != nil {
+					c.Printf("head info, height:%d, hash:%s, prev:%s\n", head.Height(), head.Hash(), head.PreHash())
+				} else {
+					c.Println("head is empty.")
+				}
+
 			},
 		})
 
@@ -451,7 +456,7 @@ func main() {
 					c.Println("node should be stopped.")
 					return
 				}
-				head, _ := node.Leger().HeadSnapshost()
+				head, _ := node.Leger().Chain().HeadSnapshot()
 
 				c.Printf("head info, height:%d, hash:%s, prev:%s\n", head.Height(), head.Hash(), head.PreHash())
 			},
@@ -469,7 +474,7 @@ func main() {
 				if len(c.Args) == 1 {
 					height, _ = strconv.Atoi(c.Args[0])
 				}
-				block := node.Leger().GetSnapshotBlocksByHeight(height)
+				block := node.Leger().Chain().GetSnapshotByHeight(height)
 				bytes, _ := json.Marshal(block)
 				c.Printf("detail info, block:%s\n", string(bytes))
 			},

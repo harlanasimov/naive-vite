@@ -60,9 +60,9 @@ type BlockType int
 
 // BlockType types.
 const (
-	SEND BlockType = iota
+	GENESIS BlockType = iota
+	SEND
 	RECEIVED
-	CREATE
 )
 
 var txStr map[BlockType]string

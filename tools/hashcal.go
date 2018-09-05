@@ -3,8 +3,9 @@ package tools
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/viteshan/naive-vite/common"
 	"strconv"
+
+	"github.com/viteshan/naive-vite/common"
 )
 
 // SHA256 hasing
@@ -28,7 +29,7 @@ func CalculateAccountHash(block *common.AccountStateBlock) string {
 }
 
 func blockStr(block common.Block) string {
-	return block.Timestamp().String() + string(block.Signer()) + string(block.PreHash()) + strconv.Itoa(block.Height())
+	return strconv.FormatInt(block.Timestamp().Unix(), 10) + string(block.Signer()) + string(block.PreHash()) + strconv.Itoa(block.Height())
 }
 
 func CalculateSnapshotHash(block *common.SnapshotBlock) string {

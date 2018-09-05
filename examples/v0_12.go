@@ -275,7 +275,7 @@ func (self *V0_12) submitTx(from string, to string, amount int) {
 	}
 }
 func (self *V0_12) printSnapshot(conn net.Conn) {
-	headSnaphost, _ := self.ledger.HeadSnapshost()
+	headSnaphost, _ := self.ledger.HeadSnapshot()
 	io.WriteString(conn, "current snapshot height is:"+strconv.Itoa(headSnaphost.Height())+"\n")
 }
 func (self *V0_12) printReceivedTxs(conn net.Conn, address string) {

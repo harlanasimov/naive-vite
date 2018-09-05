@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/asaskevich/EventBus"
+	"github.com/viteshan/naive-vite/chain"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
@@ -32,8 +33,9 @@ func NewNode(cfg config.Node) Node {
 	self.cfg = cfg
 	self.p2p = p2p.NewP2P(self.cfg.P2pCfg)
 	self.syncer = syncer.NewSyncer(self.p2p, self.bus)
-	self.ledger = ledger.NewLedger()
-	self.consensus = consensus.NewConsensus(ledger.GetGenesisSnapshot().Timestamp(), self.cfg.ConsensusCfg)
+	self.bc = chain.NewChain()
+	self.ledger = ledger.NewLedger(self.bc)
+	self.consensus = consensus.NewConsensus(chain.GetGenesisSnapshot().Timestamp(), self.cfg.ConsensusCfg)
 
 	if self.cfg.MinerCfg.Enabled {
 		if self.cfg.MinerCfg.CoinBase().String() == "" {
@@ -46,6 +48,7 @@ func NewNode(cfg config.Node) Node {
 }
 
 type node struct {
+	bc        chain.BlockChain
 	p2p       p2p.P2P
 	syncer    syncer.Syncer
 	ledger    ledger.Ledger
@@ -60,7 +63,7 @@ type node struct {
 }
 
 func (self *node) Init() {
-	self.syncer.Init(self.ledger)
+	self.syncer.Init(self.ledger.Chain(), self.ledger.Pool())
 	self.ledger.Init(self.syncer)
 	self.consensus.Init()
 	self.p2p.Init()

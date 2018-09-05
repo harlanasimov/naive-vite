@@ -61,10 +61,8 @@ type chainPool struct {
 	snippetChains   map[string]*snippetChain // head is fixed
 	chains          map[string]*forkedChain
 	verifier        verifier.Verifier
-	insertChainFn   insertChainForkCheck
-	removeChainFn   removeChainForkCheck
 	diskChain       *diskChain
-	//reader          Chain
+	//rw          Chain
 }
 
 func (self *chainPool) forkChain(forked *forkedChain, snippet *snippetChain) (*forkedChain, error) {
@@ -82,13 +80,13 @@ func (self *chainPool) forkChain(forked *forkedChain, snippet *snippetChain) (*f
 }
 
 type diskChain struct {
-	reader  ChainReader
+	rw      chainRw
 	chainId string
 }
 
 func (self *diskChain) getBlock(height int, refer bool) *BlockForPool {
 	forkVersion := version.ForkVersion()
-	block := self.reader.GetBlock(height)
+	block := self.rw.getBlock(height)
 	if block == nil {
 		return nil
 	} else {
@@ -97,7 +95,7 @@ func (self *diskChain) getBlock(height int, refer bool) *BlockForPool {
 }
 func (self *diskChain) getBlockBetween(tail int, head int, refer bool) *BlockForPool {
 	//forkVersion := version.ForkVersion()
-	//block := self.reader.GetBlock(height)
+	//block := self.rw.GetBlock(height)
 	//if block == nil {
 	//	return nil
 	//} else {
@@ -107,7 +105,7 @@ func (self *diskChain) getBlockBetween(tail int, head int, refer bool) *BlockFor
 }
 
 func (self *diskChain) contains(height int) bool {
-	return self.reader.Head().Height() >= height
+	return self.rw.head().Height() >= height
 }
 
 func (self *diskChain) id() string {
@@ -115,10 +113,11 @@ func (self *diskChain) id() string {
 }
 
 func (self *diskChain) Head() common.Block {
-	head := self.reader.Head()
+	head := self.rw.head()
 	if head == nil {
-		return self.reader.GetBlock(-1) // hack implement
+		return self.rw.getBlock(-1) // hack implement
 	}
+
 	return head
 }
 
@@ -233,19 +232,16 @@ func newBlockChainPool(name string) *BCPool {
 		Id: name,
 	}
 }
-func (self *BCPool) init(insertChainFn insertChainForkCheck,
-	removeChainFn removeChainForkCheck,
+func (self *BCPool) init(
+	rw chainRw,
 	verifier verifier.Verifier,
-	syncer *fetcher,
-	reader ChainReader) {
+	syncer *fetcher) {
 
-	diskChain := &diskChain{chainId: self.Id + "-diskchain", reader: reader}
+	diskChain := &diskChain{chainId: self.Id + "-diskchain", rw: rw}
 	chainpool := &chainPool{
-		poolId:        self.Id,
-		insertChainFn: insertChainFn,
-		removeChainFn: removeChainFn,
-		verifier:      verifier,
-		diskChain:     diskChain,
+		poolId:    self.Id,
+		verifier:  verifier,
+		diskChain: diskChain,
 	}
 	chainpool.current = &forkedChain{}
 
@@ -546,7 +542,7 @@ func (self *chainPool) rollback(newHeight int) error {
 	for i := height; i > newHeight; i-- {
 		block := self.diskChain.getBlock(i, true)
 		block.verifyStat = self.verifier.NewVerifyStat(verifier.VerifyReferred, block.block)
-		e := self.removeChainFn(block.block)
+		e := self.diskChain.rw.removeChain(block.block)
 		if e != nil {
 			log.Error("remove from chain error. %v", e)
 			return e
@@ -584,7 +580,7 @@ func (self *chainPool) writeToChain(chain *forkedChain, wrapper *BlockForPool) e
 	height := block.Height()
 	hash := block.Hash()
 	forkVersion := wrapper.forkVersion
-	err := self.insertChainFn(block, forkVersion)
+	err := self.diskChain.rw.insertChain(block, forkVersion)
 	if err == nil {
 		chain.removeTail(wrapper)
 		//self.fixReferInsert(chain, self.diskChain, height)
@@ -716,7 +712,7 @@ func (self *BlockForPool) reset() {
 //}
 //
 //func (self *bcWaitting) init() {
-//	head := self.reader.Head()
+//	head := self.rw.Head()
 //	self.chainHeadH = head.Height()
 //	self.headH = self.chainHeadH
 //	self.head = head
@@ -859,11 +855,11 @@ func (self *BCPool) AddDirectBlock(block common.Block) error {
 	case verifier.FAIL:
 		return errors.New("add error.")
 	case verifier.SUCCESS:
-		self.chainpool.insertChainFn(block, forkVersion)
+		self.chainpool.diskChain.rw.insertChain(block, forkVersion)
 		head := self.chainpool.diskChain.Head()
 		self.chainpool.insertNotify(head)
 		if self.verifierSuccesscallback != nil {
-			self.verifierSuccesscallback(head, nil)
+			self.verifierSuccesscallback(block, nil)
 		}
 		return nil
 	default:

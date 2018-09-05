@@ -14,37 +14,35 @@ type accountReader interface {
 	FindBlockAboveSnapshotHeight(height int) *common.AccountStateBlock
 }
 
-type AccountPool struct {
+type accountPool struct {
 	BCPool
-	accountReader accountReader
-	mu            sync.Locker
-	closed        chan struct{}
-	wg            sync.WaitGroup
+	mu     sync.Locker
+	closed chan struct{}
+	wg     sync.WaitGroup
+	rw     *accountCh
 }
 
-func NewAccountPool(name string) *AccountPool {
-	pool := &AccountPool{}
+func newAccountPool(name string, rw *accountCh) *accountPool {
+	pool := &accountPool{}
 	pool.Id = name
 	pool.closed = make(chan struct{})
 	pool.verifierFailcallback = pool.insertAccountFailCallback
 	pool.verifierSuccesscallback = pool.insertAccountSuccessCallback
+	pool.rw = rw
 	return pool
 }
 
-func (self *AccountPool) Init(insertChainFn insertChainForkCheck,
-	removeChainFn removeChainForkCheck,
+func (self *accountPool) Init(
 	verifier verifier.Verifier,
 	syncer *fetcher,
-	reader ChainReader,
-	mu sync.Locker,
-	accountReader accountReader) {
+	mu sync.Locker) {
+
 	self.mu = mu
-	self.accountReader = accountReader
-	self.BCPool.init(insertChainFn, removeChainFn, verifier, syncer, reader)
+	self.BCPool.init(self.rw, verifier, syncer)
 }
 
 // 1. must be in diskchain
-func (self *AccountPool) TryRollback(rollbackHeight int, rollbackHash string) ([]*common.AccountStateBlock, error) {
+func (self *accountPool) TryRollback(rollbackHeight int, rollbackHash string) ([]*common.AccountStateBlock, error) {
 	{ // check logic
 		w := self.chainpool.diskChain.getBlock(rollbackHeight, false)
 		if w == nil || w.block.Hash() != rollbackHash {
@@ -71,13 +69,13 @@ func (self *AccountPool) TryRollback(rollbackHeight int, rollbackHash string) ([
 }
 
 // rollback to current
-func (self *AccountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, snapshotHash string) (bool, *common.AccountStateBlock, error) {
+func (self *accountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, snapshotHash string) (bool, *common.AccountStateBlock, error) {
 	head := self.chainpool.diskChain.Head().(*common.AccountStateBlock)
 	if head.SnapshotHeight < snapshotHeight {
 		return false, nil, nil
 	}
 
-	accountBlock := self.accountReader.FindBlockAboveSnapshotHeight(snapshotHeight)
+	accountBlock := self.rw.findAboveSnapshotHeight(snapshotHeight)
 	if accountBlock == nil {
 		return true, nil, nil
 	} else {
@@ -85,7 +83,7 @@ func (self *AccountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, sn
 	}
 }
 
-func (self *AccountPool) FindRollbackPointForAccountHashH(height int, hash string) (bool, *common.AccountStateBlock, Chain, error) {
+func (self *accountPool) FindRollbackPointForAccountHashH(height int, hash string) (bool, *common.AccountStateBlock, Chain, error) {
 	chain := self.whichChain(height, hash)
 	if chain == nil {
 		return false, nil, nil, nil
@@ -100,7 +98,7 @@ func (self *AccountPool) FindRollbackPointForAccountHashH(height int, hash strin
 	return true, forkPoint.(*common.AccountStateBlock), chain, nil
 }
 
-func (self *AccountPool) loop() {
+func (self *accountPool) loop() {
 	defer self.wg.Done()
 	for {
 		select {
@@ -116,31 +114,31 @@ func (self *AccountPool) loop() {
 	}
 }
 
-func (self *AccountPool) loopCheckCurrentInsert() {
+func (self *accountPool) loopCheckCurrentInsert() {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.CheckCurrentInsert()
 }
-func (self *AccountPool) Start() {
+func (self *accountPool) Start() {
 	self.wg.Add(1)
 	go self.loop()
 	log.Info("account_pool[%s] started", self.Id)
 }
 
-func (self *AccountPool) Stop() {
+func (self *accountPool) Stop() {
 	close(self.closed)
 	self.wg.Wait()
 	log.Info("account_pool[%s] stopped", self.Id)
 }
 
-func (self *AccountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {
+func (self *accountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {
 	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
 }
 
-func (self *AccountPool) insertAccountSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
+func (self *accountPool) insertAccountSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
 	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
 }
-func (self *AccountPool) FindInChain(hash string, height int) bool {
+func (self *accountPool) FindInChain(hash string, height int) bool {
 
 	for _, c := range self.chainpool.chains {
 		b := c.heightBlocks[height]
