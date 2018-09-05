@@ -138,6 +138,9 @@ type chain struct {
 	chainId      string
 }
 
+func (self *chain) size() int {
+	return self.headHeight - self.tailHeight
+}
 func (self *chain) HeadHeight() int {
 	return self.headHeight
 }
@@ -809,6 +812,9 @@ func (a ByTailHeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByTailHeight) Less(i, j int) bool { return a[i].tailHeight < a[j].tailHeight }
 
 func (self *BCPool) LoopGenSnippetChains() {
+	if len(self.blockpool.freeBlocks) == 0 {
+		return
+	}
 	//  self.chainpool.snippetChains
 	sortPending := copyValuesFrom(self.blockpool.freeBlocks)
 	sort.Reverse(ByHeight(sortPending))
@@ -867,6 +873,9 @@ func (self *BCPool) AddDirectBlock(block common.Block) error {
 	}
 }
 func (self *BCPool) LoopAppendChains() {
+	if len(self.chainpool.snippetChains) == 0 {
+		return
+	}
 	sortSnippets := copyMap(self.chainpool.snippetChains)
 	sort.Sort(ByTailHeight(sortSnippets))
 
@@ -893,6 +902,9 @@ func (self *BCPool) LoopAppendChains() {
 	}
 }
 func (self *BCPool) LoopFetchForSnippets() {
+	if len(self.chainpool.snippetChains) == 0 {
+		return
+	}
 	sortSnippets := copyMap(self.chainpool.snippetChains)
 	sort.Sort(ByTailHeight(sortSnippets))
 

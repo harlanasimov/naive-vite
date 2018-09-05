@@ -25,7 +25,8 @@ func CalculateAccountHash(block *common.AccountStateBlock) string {
 		block.BlockType.String() +
 		block.From +
 		block.To +
-		block.SourceHash)
+		block.SourceHash +
+		strconv.Itoa(block.SourceHeight))
 }
 
 func blockStr(block common.Block) string {

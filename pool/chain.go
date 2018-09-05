@@ -38,7 +38,7 @@ func (self *accountCh) head() common.Block {
 
 func (self *accountCh) getBlock(height int) common.Block {
 	if height == -1 {
-		return common.NewAccountBlock(-1, "", "", "", time.Unix(0, 0), 0, 0, 0, "", common.SEND, "", "", "")
+		return common.NewAccountBlock(-1, "", "", "", time.Unix(0, 0), 0, 0, 0, "", common.SEND, "", "", "", -1)
 	}
 	block := self.bc.GetAccountByHeight(self.address, height)
 	if block == nil {

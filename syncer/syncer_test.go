@@ -161,5 +161,5 @@ func genSnapshotBlock(hashH common.HashHeight) *common.SnapshotBlock {
 }
 func genAccountBlock(address string, hashH common.HashHeight) *common.AccountStateBlock {
 	preHashH := genHashHeight(hashH.Height - 1)
-	return common.NewAccountBlock(hashH.Height, hashH.Hash, preHashH.Hash, address, time.Now(), 0, 0, 0, "0", common.SEND, address, "viteshan2", "")
+	return common.NewAccountBlock(hashH.Height, hashH.Hash, preHashH.Hash, address, time.Now(), 0, 0, 0, "0", common.SEND, address, "viteshan2", "", -1)
 }

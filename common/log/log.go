@@ -4,13 +4,23 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/user"
+	"path"
 	"strconv"
 	"time"
 )
 
 func init() {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	rand.Seed(time.Now().Unix())
-	fileName := "testlogfile." + strconv.Itoa(rand.Intn(10000))
+
+	dir := path.Join(usr.HomeDir, "naive_vite", "log")
+	os.MkdirAll(dir, os.ModePerm)
+	fileName := path.Join(dir, "testlogfile."+strconv.Itoa(rand.Intn(10000)))
 	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)

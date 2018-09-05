@@ -7,12 +7,9 @@ import (
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
 )
-
-type accountReader interface {
-	FindBlockAboveSnapshotHeight(height int) *common.AccountStateBlock
-}
 
 type accountPool struct {
 	BCPool
@@ -115,10 +112,58 @@ func (self *accountPool) loop() {
 }
 
 func (self *accountPool) loopCheckCurrentInsert() {
+	if self.chainpool.current.size() == 0 {
+		return
+	}
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.CheckCurrentInsert()
 }
+
+func (self *accountPool) accountTryInsert() {
+	cp := self.chainpool
+	current := cp.current
+	minH := current.tailHeight + 1
+	headH := current.headHeight
+L:
+	for i := minH; i <= headH; i++ {
+		wrapper := current.getBlock(i, false)
+		block := wrapper.block
+		stat := wrapper.verifyStat
+		//if !wrapper.checkForkVersion() {
+		wrapper.reset()
+		//}
+		tools.CalculateAccountHash()
+		cp.verifier.VerifyReferred(block, stat)
+		if !wrapper.checkForkVersion() {
+			wrapper.reset()
+			continue
+		}
+		result := stat.VerifyResult()
+		switch result {
+		case verifier.PENDING:
+
+		case verifier.FAIL:
+			log.Error("forkedChain forked. verify result is %s. block info:account[%s],hash[%s],height[%d]",
+				result, block.Signer(), block.Hash(), block.Height())
+			if verifierFailcallback != nil {
+				verifierFailcallback(block, stat)
+			}
+			break L
+		case verifier.SUCCESS:
+			if block.Height() == current.tailHeight+1 {
+				err := cp.writeToChain(current, wrapper)
+				if err == nil && insertSuccessCallback != nil {
+					insertSuccessCallback(block, stat)
+				}
+			}
+		default:
+			log.Error("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
+				result, block.Signer(), block.Hash(), block.Height())
+		}
+	}
+}
+
 func (self *accountPool) Start() {
 	self.wg.Add(1)
 	go self.loop()

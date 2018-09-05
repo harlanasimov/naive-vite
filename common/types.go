@@ -141,6 +141,7 @@ type AccountStateBlock struct {
 	From           string
 	To             string
 	SourceHash     string // source Block Thash
+	SourceHeight   int
 }
 
 type SnapshotBlock struct {
@@ -192,6 +193,7 @@ func NewAccountBlock(
 	from string,
 	to string,
 	sourceHash string,
+	sourceHeight int,
 ) *AccountStateBlock {
 
 	block := &AccountStateBlock{}
@@ -208,6 +210,7 @@ func NewAccountBlock(
 	block.From = from
 	block.To = to
 	block.SourceHash = sourceHash
+	block.SourceHeight = sourceHeight
 	return block
 }
 
@@ -223,6 +226,7 @@ func NewAccountBlockFrom(
 	from string,
 	to string,
 	sourceHash string,
+	sourceHeight int,
 ) *AccountStateBlock {
 	block := &AccountStateBlock{}
 	if accountBlock == nil {
@@ -243,6 +247,7 @@ func NewAccountBlockFrom(
 	block.From = from
 	block.To = to
 	block.SourceHash = sourceHash
+	block.SourceHeight = sourceHeight
 	return block
 }
 

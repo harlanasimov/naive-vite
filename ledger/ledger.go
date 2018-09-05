@@ -87,7 +87,7 @@ func (self *ledger) RequestAccountBlock(from string, to string, amount int) erro
 	headSnaphost, _ := self.bc.HeadSnapshot()
 
 	newBlock := common.NewAccountBlockFrom(headAccount, from, time.Now(), amount, headSnaphost,
-		common.SEND, from, to, "")
+		common.SEND, from, to, "", -1)
 	newBlock.SetHash(tools.CalculateAccountHash(newBlock))
 	err := self.bpool.AddDirectAccountBlock(from, newBlock)
 	if err == nil {
@@ -115,7 +115,7 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 	snapshotBlock, _ := self.bc.HeadSnapshot()
 
 	modifiedAmount := -reqBlock.ModifiedAmount
-	block := common.NewAccountBlock(prevHeight+1, "", prevHash, to, time.Now(), prevAmount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, from, to, reqHash)
+	block := common.NewAccountBlock(prevHeight+1, "", prevHash, to, time.Now(), prevAmount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, from, to, reqHash, reqBlock.Height())
 	block.SetHash(tools.CalculateAccountHash(block))
 	err := self.bpool.AddDirectAccountBlock(to, block)
 	if err == nil {

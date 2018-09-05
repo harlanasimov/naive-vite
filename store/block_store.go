@@ -34,7 +34,7 @@ func NewMemoryStore(snapshotGenesis *common.SnapshotBlock) BlockStore {
 	self := &blockMemoryStore{}
 	for _, a := range genesisAccounts {
 		genesis := common.NewAccountBlock(0, "", "", a, time.Unix(0, 0),
-			200, 0, 0, "", common.GENESIS, a, a, "")
+			200, 0, 0, "", common.GENESIS, a, a, "", -1)
 		genesis.SetHash(tools.CalculateAccountHash(genesis))
 		self.PutAccount(a, genesis)
 		self.SetAccountHead(a, &common.HashHeight{Hash: genesis.Hash(), Height: genesis.Height()})
