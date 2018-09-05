@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/asaskevich/EventBus"
+	"github.com/viteshan/naive-vite/chain"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/consensus"
-	"github.com/viteshan/naive-vite/ledger"
 )
 
 type SnapshotRW struct {
@@ -38,7 +38,7 @@ func genMinerAuto(committee *consensus.Committee, status face.SyncStatus) (Miner
 }
 
 func genCommitee() *consensus.Committee {
-	genesisTime := ledger.GetGenesisSnapshot().Timestamp()
+	genesisTime := chain.GetGenesisSnapshot().Timestamp()
 	committee := consensus.NewCommittee(genesisTime, 1, int32(len(consensus.DefaultMembers)))
 	return committee
 }

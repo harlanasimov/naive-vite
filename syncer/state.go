@@ -136,6 +136,7 @@ func (self *state) update(msg *stateMsg, peer p2p.Peer) {
 	} else {
 		state := prevState.(*handState)
 		state.S.Height = msg.Height
+		state.S.Hash = msg.Hash
 	}
 	head, e := self.rw.HeadSnapshot()
 	if e != nil {
@@ -248,7 +249,7 @@ NET:
 			}
 			if head.Height() > ta.height {
 				log.Info("sync first finish.")
-
+				self.firstSyncDone()
 				return
 			}
 		}
