@@ -8,6 +8,7 @@ import (
 
 	"github.com/asaskevich/EventBus"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
@@ -111,9 +112,9 @@ func TestSyncer(t *testing.T) {
 
 	var hashHeight common.HashHeight
 	hashHeight = genHashHeight(5)
-	fetcher.FetchAccount(address, hashHeight, 5)
+	fetcher.Fetch(face.FetchRequest{Hash: hashHeight.Hash, Height: hashHeight.Height, PrevCnt: 5, Chain: address})
 	hashHeight = genHashHeight(6)
-	fetcher.FetchAccount(address, hashHeight, 5)
+	fetcher.Fetch(face.FetchRequest{Hash: hashHeight.Hash, Height: hashHeight.Height, PrevCnt: 5, Chain: address})
 
 	time.Sleep(2 * time.Second)
 	if testHandler.cnt != 6 {

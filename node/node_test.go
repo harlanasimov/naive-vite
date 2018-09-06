@@ -147,6 +147,7 @@ func TestSend(t *testing.T) {
 }
 
 func TestBenchmark(t *testing.T) {
+	log.InitPath()
 	if err := agent.Listen(agent.Options{}); err != nil {
 		log.Fatal("%v", err)
 	}
@@ -164,23 +165,23 @@ func TestBenchmark(t *testing.T) {
 	if balance != 200 {
 		t.Error("balance is wrong.", balance, 200)
 	}
-	for i := 0; i < 4; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("jie", addr, -4)
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-	}
-	for i := 0; i < 4; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("viteshan", addr, -4)
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-	}
 	N := 4
+	for i := 0; i < N; i++ {
+		addr := "jie" + strconv.Itoa(i)
+		err := n.Leger().RequestAccountBlock("jie", addr, -30)
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+	}
+	for i := 0; i < N; i++ {
+		addr := "jie" + strconv.Itoa(i)
+		err := n.Leger().RequestAccountBlock("viteshan", addr, -30)
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+	}
 
 	for i := 0; i < N; i++ {
 		from := "jie" + strconv.Itoa(i)

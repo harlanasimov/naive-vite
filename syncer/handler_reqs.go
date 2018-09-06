@@ -56,7 +56,7 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 	if len(hashes) == 0 {
 		return
 	}
-	log.Info("send account hashes, address:%s, hashSize:%d, PId:%s", msg.Address, len(hashes), p.Id())
+	log.Info("send account hashes, address:%s, hashSize:%d, PId:%s, height:%d, prevCnt:%d", msg.Address, len(hashes), p.Id(), msg.Height, msg.PrevCnt)
 	m := split(hashes, 1000)
 
 	for _, m1 := range m {

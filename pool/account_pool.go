@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync"
 
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/verifier"
@@ -15,6 +17,8 @@ type accountPool struct {
 	mu         sync.Locker
 	rw         *accountCh
 	verifyTask verifier.Task
+
+	loopTime time.Time
 }
 
 func newAccountPool(name string, rw *accountCh, v *version.Version) *accountPool {
@@ -22,6 +26,7 @@ func newAccountPool(name string, rw *accountCh, v *version.Version) *accountPool
 	pool.Id = name
 	pool.rw = rw
 	pool.version = v
+	pool.loopTime = time.Now()
 	return pool
 }
 
@@ -92,12 +97,17 @@ func (self *accountPool) FindRollbackPointForAccountHashH(height int, hash strin
 }
 
 func (self *accountPool) loop() int {
-	sum := 0
-	sum = sum + self.loopGenSnippetChains()
-	sum = sum + self.loopAppendChains()
-	sum = sum + self.loopFetchForSnippets()
-	sum = sum + self.loopAccountTryInsert()
-	return sum
+	now := time.Now()
+	if now.After(self.loopTime.Add(time.Millisecond * 200)) {
+		self.loopTime = now
+		sum := 0
+		sum = sum + self.loopGenSnippetChains()
+		sum = sum + self.loopAppendChains()
+		sum = sum + self.loopFetchForSnippets()
+		sum = sum + self.loopAccountTryInsert()
+		return sum
+	}
+	return 0
 }
 
 func (self *accountPool) loopAccountTryInsert() int {

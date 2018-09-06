@@ -87,10 +87,43 @@ func (self *defaultRetryPolicy) newRetryStatus() *RetryStatus {
 	return &RetryStatus{done: false, cnt: 1, ftime: time.Now()}
 }
 
+type addressRetryPolicy struct {
+	fetchedAddr sync.Map
+}
+
+func (self *addressRetryPolicy) done(key string) {
+}
+
+func (self *addressRetryPolicy) retry(key string) bool {
+	value, ok := self.fetchedAddr.Load(key)
+	if ok && value != nil {
+		var status = value.(*RetryStatus)
+		now := time.Now()
+		status.inc()
+		if now.After(status.dtime.Add(time.Second)) {
+			return true
+		}
+		// cnt>5 && now - dtime > 10s
+		if status.cnt > 3 {
+			status.reset()
+			return true
+		}
+	} else {
+		self.fetchedAddr.Store(key, self.newRetryStatus())
+		return true
+	}
+	return false
+}
+
+func (self *addressRetryPolicy) newRetryStatus() *RetryStatus {
+	return &RetryStatus{done: false, cnt: 1, ftime: time.Now()}
+}
+
 type fetcher struct {
 	sender *sender
 
-	retryPolicy retryPolicy
+	retryPolicy  retryPolicy
+	addressRetry retryPolicy
 }
 
 func (self *fetcher) fetchSnapshotBlockFromPeer(hash common.HashHeight, peer p2p.Peer) {

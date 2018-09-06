@@ -231,7 +231,7 @@ func (self *pool) PendingAccountTo(h *common.AccountHashH) error {
 	bytes, _ := json.Marshal(h)
 	log.Info("inChain:%v, accounts:%s", inChain, string(bytes))
 	if !inChain {
-		self.fetcher.FetchAccount(h.Addr, common.HashHeight{Hash: h.Hash, Height: h.Height}, 5)
+		self.fetcher.Fetch(face.FetchRequest{Chain: h.Addr, Height: h.Height, Hash: h.Hash, PrevCnt: 5})
 		return nil
 	}
 	return nil
@@ -244,7 +244,7 @@ func (self *pool) ForkAccountTo(h *common.AccountHashH) error {
 	bytes, _ := json.Marshal(h)
 	log.Info("inChain:%v, accounts:%s", inChain, string(bytes))
 	if !inChain {
-		self.fetcher.FetchAccount(h.Addr, common.HashHeight{Hash: h.Hash, Height: h.Height}, 5)
+		self.fetcher.Fetch(face.FetchRequest{Chain: h.Addr, Height: h.Height, Hash: h.Hash, PrevCnt: 5})
 		return nil
 	}
 	ok, block, chain, err := this.FindRollbackPointForAccountHashH(h.Height, h.Hash)

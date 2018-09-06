@@ -86,7 +86,7 @@ func NewSyncer(net p2p.P2P, bus EventBus.Bus) Syncer {
 	self := &syncer{bus: bus}
 	self.sender = &sender{net: net}
 	self.p2p = net
-	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}}
+	self.fetcher = &fetcher{sender: self.sender, retryPolicy: &defaultRetryPolicy{fetchedHashs: make(map[string]*RetryStatus)}, addressRetry: &addressRetryPolicy{}}
 	return self
 }
 func (self *syncer) Init(reader face.ChainReader, writer face.PoolWriter) {
