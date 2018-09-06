@@ -37,6 +37,7 @@ type chainRw struct {
 type Fetcher interface {
 	FetchAccount(address string, hash common.HashHeight, prevCnt int)
 	FetchSnapshot(hash common.HashHeight, prevCnt int)
+	Fetch(request face.FetchRequest)
 }
 
 type Sender interface {

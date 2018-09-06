@@ -1,15 +1,17 @@
 package verifier
 
 import (
+	"time"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
+	"github.com/viteshan/naive-vite/version"
 )
 
 type VerifyResult int
 
 const (
-	NONE VerifyResult = iota
-	PENDING
+	PENDING VerifyResult = iota
 	FAIL
 	SUCCESS
 )
@@ -30,255 +32,112 @@ const (
 
 type Callback func(block common.Block, stat BlockVerifyStat)
 type Verifier interface {
-	VerifyReferred(block common.Block, stat BlockVerifyStat)
-	NewVerifyStat(t VerifyType, block common.Block) BlockVerifyStat
+	VerifyReferred(block common.Block) (BlockVerifyStat, Task)
 }
 
 type BlockVerifyStat interface {
 	VerifyResult() VerifyResult
-	Reset()
+	ErrMsg() string
 }
 
-type SnapshotVerifier struct {
-	reader face.ChainReader
+type Task interface {
+	Done() bool
+	Requests() []face.FetchRequest
 }
 
-func NewSnapshotVerifier(r face.ChainReader) *SnapshotVerifier {
-	verifier := &SnapshotVerifier{reader: r}
-	return verifier
+type verifyTask struct {
+	tasks   []Task
+	version int
+	reader  face.ChainReader
+	v       *version.Version
+	fail    bool
+	t       time.Time
 }
 
-func (self *SnapshotVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) {
-	block := b.(*common.SnapshotBlock)
-
-	stat := s.(*SnapshotBlockVerifyStat)
-
-	accounts := block.Accounts
-	if stat.result.Done() {
-		return
-	} else {
-		stat.result = PENDING
-	}
-	i := 0
-	for _, v := range accounts {
-		result := stat.results[v.Addr]
-		if result.Done() {
-			i++
-			continue
-		}
-
-		addr := v.Addr
-		hash := v.Hash
-		height := v.Height
-		block := self.reader.GetAccountByHeight(addr, height)
-		if block == nil {
-			stat.results[v.Addr] = PENDING
-		} else {
-			if block.Hash() == hash {
-				i++
-				stat.results[v.Addr] = SUCCESS
-			} else {
-				stat.results[v.Addr] = FAIL
-				stat.result = FAIL
-				return
-			}
+func (self *verifyTask) Requests() []face.FetchRequest {
+	var reqs []face.FetchRequest
+	for _, t := range self.tasks {
+		for _, r := range t.Requests() {
+			reqs = append(reqs, r)
 		}
 	}
-	if i == len(accounts) {
-		stat.result = SUCCESS
-		return
-	}
+	return reqs
 }
 
-type SnapshotBlockVerifyStat struct {
-	result   VerifyResult
-	accounts []*common.AccountHashH
-	results  map[string]VerifyResult
-}
-
-func (self *SnapshotBlockVerifyStat) Results() map[string]VerifyResult {
-	return self.results
-}
-
-func (self *SnapshotBlockVerifyStat) VerifyResult() VerifyResult {
-	return self.result
-}
-
-func (self *SnapshotBlockVerifyStat) Reset() {
-	self.result = PENDING
-	self.results = make(map[string]VerifyResult)
-}
-
-func (self *SnapshotVerifier) NewVerifyStat(t VerifyType, b common.Block) BlockVerifyStat {
-	block := b.(*common.SnapshotBlock)
-
-	stat := &SnapshotBlockVerifyStat{result: NONE, accounts: block.Accounts}
-	stat.results = make(map[string]VerifyResult)
-	return stat
-}
-
-type AccountVerifier struct {
-	reader face.ChainReader
-}
-
-func NewAccountVerifier(r face.ChainReader) *AccountVerifier {
-	verifier := &AccountVerifier{reader: r}
-	return verifier
-}
-
-func (self *AccountVerifier) VerifyReferred(b common.Block, s BlockVerifyStat) {
-	block := b.(*common.AccountStateBlock)
-	stat := s.(*AccountBlockVerifyStat)
-
-	// genesis account block
-	if block.BlockType == common.GENESIS {
-		genesis, _ := self.reader.GenesisSnapshot()
-		for _, a := range genesis.Accounts {
-			if a.Hash == block.Hash() && a.Height == block.Height() {
-				stat.referredFromResult = SUCCESS
-				stat.referredSelfResult = SUCCESS
-				stat.referredSnapshotResult = SUCCESS
-				return
-			}
-		}
-		stat.referredSelfResult = FAIL
-		return
+func (self *verifyTask) Done() bool {
+	// if version increase.  task has done.
+	if self.v.Val() != self.version {
+		return true
 	}
 
-	// referred snapshot
-	snapshotHeight := block.SnapshotHeight
-	snapshotHash := block.SnapshotHash
-
-	if !stat.referredSnapshotResult.Done() {
-		snapshotR := self.reader.GetSnapshotByHashH(common.HashHeight{Hash: snapshotHash, Height: snapshotHeight})
-		if snapshotR != nil {
-			stat.referredSnapshotResult = SUCCESS
-		} else {
-			stat.referredSnapshotResult = PENDING
+	if time.Now().After(self.t.Add(time.Second * 5)) {
+		return true
+	}
+	// if because fail, must wait for version increase.
+	if self.fail {
+		return false
+	}
+	// pending task check
+	for _, t := range self.tasks {
+		if !t.Done() {
+			return false
 		}
 	}
-
-	// self amount and response
-	if !stat.referredSelfResult.Done() {
-		if block.BlockType == common.RECEIVED && block.Height() == 0 {
-			// check genesis block logic
-			genesisCheck := self.checkGenesis(block)
-			stat.referredSelfResult = genesisCheck
-			if genesisCheck == FAIL {
-				return
-			}
-
-		} else {
-			if block.BlockType == common.RECEIVED {
-				//check if it has been received
-				same := self.reader.GetAccountBySourceHash(block.To, block.SourceHash)
-				if same != nil {
-					stat.referredSelfResult = FAIL
-					return
-				}
-			}
-			selfAmount := self.checkSelfAmount(block)
-			stat.referredSelfResult = selfAmount
-			if selfAmount == FAIL {
-				return
-			}
-		}
-	}
-	// from amount
-	if !stat.referredFromResult.Done() {
-		if block.BlockType == common.RECEIVED {
-
-			fromAmount := self.checkFromAmount(block)
-			stat.referredFromResult = fromAmount
-			if fromAmount == FAIL {
-				return
-			}
-		} else {
-			stat.referredFromResult = SUCCESS
-		}
-	}
+	// all pending done
+	return true
 }
 
-type AccountBlockVerifyStat struct {
-	referredSnapshotResult VerifyResult
-	referredSelfResult     VerifyResult
-	referredFromResult     VerifyResult
+type accountPendingTask struct {
+	reader  face.AccountReader
+	result  bool
+	request face.FetchRequest
 }
 
-func (self *AccountBlockVerifyStat) VerifyResult() VerifyResult {
-	if self.referredSelfResult == FAIL ||
-		self.referredFromResult == FAIL ||
-		self.referredSnapshotResult == FAIL {
-		return FAIL
+func (self *accountPendingTask) Requests() []face.FetchRequest {
+	var reqs []face.FetchRequest
+	return append(reqs, self.request)
+}
+func (self *accountPendingTask) Done() bool {
+	if self.result {
+		return true
 	}
-	if self.referredSelfResult == SUCCESS &&
-		self.referredFromResult == SUCCESS &&
-		self.referredSnapshotResult == SUCCESS {
-		return SUCCESS
+	block, e := self.reader.HeadAccount(self.request.Chain)
+	if e == nil && block != nil && block.Height() >= self.request.Height {
+		self.result = true
+		return true
 	}
-	return PENDING
+	return false
 }
 
-func (self *AccountBlockVerifyStat) Reset() {
-	self.referredFromResult = PENDING
-	self.referredSnapshotResult = PENDING
-	self.referredSelfResult = PENDING
+type snapshotPendingTask struct {
+	reader  face.SnapshotReader
+	result  bool
+	request face.FetchRequest
 }
 
-func (self *AccountVerifier) NewVerifyStat(t VerifyType, block common.Block) BlockVerifyStat {
-	return &AccountBlockVerifyStat{}
-}
-func (self *AccountVerifier) checkSelfAmount(block *common.AccountStateBlock) VerifyResult {
-	last := self.reader.GetAccountByHeight(block.Signer(), block.Height()-1)
-
-	if last == nil {
-		return PENDING
-	}
-	if last.Hash() != block.PreHash() {
-		return FAIL
-	}
-
-	if last.SnapshotHeight > block.SnapshotHeight {
-		return FAIL
-	}
-
-	if block.BlockType == common.SEND && block.ModifiedAmount > 0 {
-		return FAIL
-	}
-	if block.BlockType == common.RECEIVED && block.ModifiedAmount < 0 {
-		return FAIL
-	}
-	if last.Amount+block.ModifiedAmount == block.Amount &&
-		block.Amount > 0 {
-		return SUCCESS
-	} else {
-		return FAIL
-	}
+func (self *snapshotPendingTask) Requests() []face.FetchRequest {
+	var reqs []face.FetchRequest
+	return append(reqs, self.request)
 }
 
-func (self *AccountVerifier) checkGenesis(block *common.AccountStateBlock) VerifyResult {
-	head, _ := self.reader.HeadAccount(block.Signer())
-	if head != nil {
-		return FAIL
+func (self *snapshotPendingTask) Done() bool {
+	if self.result {
+		return true
 	}
-	if block.PreHash() != "" || block.ModifiedAmount != block.Amount {
-		return FAIL
+
+	block, e := self.reader.HeadSnapshot()
+	if e == nil && block != nil && block.Height() >= self.request.Height {
+		self.result = true
+		return true
 	}
-	return SUCCESS
+	return false
 }
 
-func (self *AccountVerifier) checkFromAmount(block *common.AccountStateBlock) VerifyResult {
-	source := self.reader.GetAccountByHash(block.From, block.SourceHash)
-	if source == nil {
-		return PENDING
-	}
-
-	if block.SnapshotHeight < source.SnapshotHeight {
-		return FAIL
-	}
-	if source.ModifiedAmount+block.ModifiedAmount == 0 {
-		return SUCCESS
-	} else {
-		return FAIL
-	}
+func (self *verifyTask) pendingSnapshot(hash string, height int) {
+	request := face.FetchRequest{Chain: "", Hash: hash, Height: height, PrevCnt: 1}
+	self.tasks = append(self.tasks, &snapshotPendingTask{self.reader, false, request})
+}
+func (self *verifyTask) pendingAccount(addr string, height int, hash string, prevCnt int) {
+	request := face.FetchRequest{Chain: addr, Hash: hash, Height: height, PrevCnt: prevCnt}
+	self.tasks = append(self.tasks, &accountPendingTask{self.reader, false, request})
 }

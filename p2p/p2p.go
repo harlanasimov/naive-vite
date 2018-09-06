@@ -158,9 +158,10 @@ func (self *p2p) addPeer(peer *peer) {
 		return
 	}
 	self.peers[peer.peerId] = peer
-	go self.loopPeer(peer)
+	go self.loopRead(peer)
+	go peer.loopWrite()
 }
-func (self *p2p) loopPeer(peer *peer) {
+func (self *p2p) loopRead(peer *peer) {
 	self.loopWg.Add(1)
 	defer self.loopWg.Done()
 	conn := peer.conn

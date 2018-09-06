@@ -8,13 +8,19 @@ import (
 	"net"
 
 	"github.com/abiosoft/ishell"
+	"github.com/google/gops/agent"
 	"github.com/viteshan/naive-vite/common/config"
+	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/node"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
 func main() {
+	if err := agent.Listen(agent.Options{}); err != nil {
+		log.Fatal("%v", err)
+	}
+	log.InitPath()
 	// create new shell.
 	// by default, new shell includes 'exit', 'help' and 'clear' commands.
 	shell := ishell.New()
@@ -229,11 +235,15 @@ func main() {
 					c.Println("node should be started.")
 					return
 				}
-				c.ShowPrompt(false)
-				defer c.ShowPrompt(true)
-				c.Print("Address: ")
-				address := c.ReadLine()
-
+				address := ""
+				if len(c.Args) == 1 {
+					address = c.Args[0]
+				} else {
+					c.ShowPrompt(false)
+					defer c.ShowPrompt(true)
+					c.Print("Address: ")
+					address = c.ReadLine()
+				}
 				if address == "" {
 					c.Println("address is empty.")
 					return
@@ -440,10 +450,10 @@ func main() {
 			Func: func(c *ishell.Context) {
 
 				c.Printf("-----snapshot blocks-----\n")
-				c.Println("Height\tHash\tPrevHash\tAccountLen")
+				c.Println("Height\tHash\tPrevHash\tAccountLen\tTime")
 				blocks := node.Leger().ListSnapshotBlock()
 				for _, b := range blocks {
-					c.Printf("%d\t%s\t%s\t%d\n", b.Height(), b.Hash(), b.PreHash(), len(b.Accounts))
+					c.Printf("%d\t%s\t%s\t%d\t%s\n", b.Height(), b.Hash(), b.PreHash(), len(b.Accounts), b.Timestamp().Format("15:04:05"))
 				}
 			},
 		})
@@ -477,6 +487,45 @@ func main() {
 				block := node.Leger().Chain().GetSnapshotByHeight(height)
 				bytes, _ := json.Marshal(block)
 				c.Printf("detail info, block:%s\n", string(bytes))
+			},
+		})
+
+		shell.AddCmd(autoCmd)
+	}
+
+	{
+		autoCmd := &ishell.Cmd{
+			Name: "pool",
+			Help: "print pool info info.",
+		}
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "sprint",
+			Help: "print snapshot pool info.",
+			Func: func(c *ishell.Context) {
+				if node == nil {
+					c.Println("node should be started.")
+					return
+				}
+				info := node.Leger().Pool().Info("")
+				c.Println(info)
+			},
+		})
+
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "aprint",
+			Help: "print account pool info.",
+			Func: func(c *ishell.Context) {
+				if node == nil {
+					c.Println("node should be stopped.")
+					return
+				}
+				if len(c.Args) == 1 {
+					addr := c.Args[0]
+					info := node.Leger().Pool().Info(addr)
+					c.Println(info)
+				} else {
+					c.Println("aprint [addr]")
+				}
 			},
 		})
 
@@ -521,5 +570,5 @@ func startBoot(bootAddr string) p2p.Boot {
 - account[list,create,balance,send,receive]
 - ablock[list,head,reqs]
 - sblock[list,head,detail]
--
+- pool[sprint,aprint]
 */

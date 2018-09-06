@@ -100,6 +100,9 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 	if b == nil {
 		return errors.New("not exist for account[" + from + "]block[" + reqHash + "]")
 	}
+	if b.Hash() != reqHash {
+		return errors.New("GetByHashError, ReqHash:" + reqHash + ", RealHash:" + b.Hash())
+	}
 
 	reqBlock := b
 
@@ -117,6 +120,7 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 	modifiedAmount := -reqBlock.ModifiedAmount
 	block := common.NewAccountBlock(prevHeight+1, "", prevHash, to, time.Now(), prevAmount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, from, to, reqHash, reqBlock.Height())
 	block.SetHash(tools.CalculateAccountHash(block))
+
 	err := self.bpool.AddDirectAccountBlock(to, block)
 	if err == nil {
 		self.syncer.Sender().BroadcastAccountBlocks(to, []*common.AccountStateBlock{block})

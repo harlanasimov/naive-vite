@@ -3,8 +3,12 @@ package pool
 import (
 	"time"
 
+	"strconv"
+
+	"github.com/pkg/errors"
 	ch "github.com/viteshan/naive-vite/chain"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/version"
 )
 
 type chainRw interface {
@@ -18,9 +22,13 @@ type chainRw interface {
 type accountCh struct {
 	address string
 	bc      ch.BlockChain
+	version *version.Version
 }
 
 func (self *accountCh) insertChain(block common.Block, forkVersion int) error {
+	if forkVersion != self.version.Val() {
+		return errors.New("error fork version. current:" + self.version.String() + ", target:" + strconv.Itoa(forkVersion))
+	}
 	return self.bc.InsertAccountBlock(self.address, block.(*common.AccountStateBlock))
 }
 
@@ -51,7 +59,8 @@ func (self *accountCh) findAboveSnapshotHeight(height int) *common.AccountStateB
 }
 
 type snapshotCh struct {
-	bc ch.BlockChain
+	bc      ch.BlockChain
+	version *version.Version
 }
 
 func (self *snapshotCh) getBlock(height int) common.Block {

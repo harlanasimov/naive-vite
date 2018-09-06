@@ -28,7 +28,7 @@ type syncTask struct {
 
 type state struct {
 	rw      *chainRw
-	peers   map[string]*syncPeer
+	peers   sync.Map
 	fetcher *fetcher
 	sender  *sender
 	closed  chan struct{}
@@ -110,7 +110,6 @@ func (self *state) EncodeState(state interface{}) []byte {
 func newState(rw *chainRw, fetcher *fetcher, s *sender, p p2p.P2P, bus EventBus.Bus) *state {
 	self := &state{}
 	self.rw = rw
-	self.peers = make(map[string]*syncPeer)
 	self.fetcher = fetcher
 	self.sender = s
 	self.closed = make(chan struct{})
@@ -148,10 +147,10 @@ func (self *state) update(msg *stateMsg, peer p2p.Peer) {
 	}
 }
 func (self *state) peerConnected(peer p2p.Peer) {
-
+	self.peers.Store(peer.Id(), &syncPeer{peer: peer})
 }
 func (self *state) peerClosed(peer p2p.Peer) {
-
+	self.peers.Delete(peer.Id())
 }
 func (self *state) start() {
 	go self.loop()
@@ -206,11 +205,14 @@ NET:
 			log.Info("link other node fail. but started.")
 			self.firstSyncDone()
 		case <-t.C:
-			if len(self.peers) > 0 {
-
+			i := 0
+			self.peers.Range(func(_, _ interface{}) bool {
+				i++
+				return true
+			})
+			if i > 0 {
 				p := self.bestPeer()
 				if p != nil {
-					ta = &syncTask{}
 					s := p.GetState().(*handState)
 					ta.hash = s.S.Hash
 					ta.height = s.S.Height
@@ -227,10 +229,9 @@ NET:
 		log.Error("read snapshot head error:%v", e)
 		return
 	}
-	if head.Height() > ta.height {
+	if head.Height() >= ta.height {
 		log.Info("need not sync, self height:%d, peer height:%d, peer id:%s", head.Height(), ta.height, ta.peer.Id())
-		close(ta.closed)
-		ta.done = 1
+		self.firstSyncDone()
 		return
 	}
 	self.sender.requestSnapshotBlockByPeer(common.HashHeight{Hash: ta.hash, Height: ta.height}, ta.peer)
@@ -266,12 +267,17 @@ func (self *state) firstSyncDone() {
 func (self *state) bestPeer() p2p.Peer {
 	var r p2p.Peer
 	h := -1
-	for _, p := range self.peers {
-		s := p.peer.GetState().(*handState)
+
+	self.peers.Range(func(_, p interface{}) bool {
+		p1 := p.(*syncPeer)
+		s := p1.peer.GetState().(*handState)
 		if s.S.Height > h {
-			r = p.peer
+			r = p1.peer
 			h = s.S.Height
+			return false
 		}
-	}
+		return true
+	})
+
 	return r
 }

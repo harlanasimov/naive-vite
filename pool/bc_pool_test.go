@@ -33,8 +33,6 @@ func (self *TestVerifier) VerifyReferred(block common.Block, stat verifier.Block
 	case *TestBlockVerifyStat:
 		testStat := stat.(*TestBlockVerifyStat)
 		switch testStat.result {
-		case verifier.NONE:
-			testStat.result = verifier.PENDING
 		case verifier.PENDING:
 			testStat.result = verifier.SUCCESS
 		}
@@ -42,7 +40,7 @@ func (self *TestVerifier) VerifyReferred(block common.Block, stat verifier.Block
 }
 
 func (self *TestVerifier) NewVerifyStat(t verifier.VerifyType, block common.Block) verifier.BlockVerifyStat {
-	return &TestBlockVerifyStat{result: verifier.NONE}
+	return &TestBlockVerifyStat{result: verifier.PENDING}
 }
 
 type TestSyncer struct {

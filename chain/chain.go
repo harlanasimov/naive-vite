@@ -18,7 +18,7 @@ type BlockChain interface {
 }
 
 type blockchain struct {
-	ac       map[string]*accountChain
+	ac       sync.Map
 	sc       *snapshotChain
 	store    store.BlockStore
 	listener face.ChainListener
@@ -31,19 +31,18 @@ func NewChain() BlockChain {
 	self.store = store.NewMemoryStore(GetGenesisSnapshot())
 	self.sc = newSnapshotChain(self.store)
 	self.listener = &defaultChainListener{}
-	self.ac = make(map[string]*accountChain)
 	return self
 }
 func (self *blockchain) selfAc(addr string) *accountChain {
-	chain, ok := self.ac[addr]
+	chain, ok := self.ac.Load(addr)
 	if !ok {
 		c := newAccountChain(addr, self.listener, self.store)
 		self.mu.Lock()
 		defer self.mu.Unlock()
-		self.ac[addr] = c
-		return self.ac[addr]
+		self.ac.Store(addr, c)
+		chain, _ = self.ac.Load(addr)
 	}
-	return chain
+	return chain.(*accountChain)
 }
 
 // query received block by send block
@@ -55,13 +54,14 @@ func (self *blockchain) NextAccountSnapshot() (common.HashHeight, []*common.Acco
 	head := self.sc.head
 	//common.SnapshotBlock{}
 	var accounts []*common.AccountHashH
-	for k, v := range self.ac {
-		i, s := v.NextSnapshotPoint()
+	self.ac.Range(func(k, v interface{}) bool {
+		i, s := v.(*accountChain).NextSnapshotPoint()
 		if i < 0 {
-			continue
+			return true
 		}
-		accounts = append(accounts, common.NewAccountHashH(k, s, i))
-	}
+		accounts = append(accounts, common.NewAccountHashH(k.(string), s, i))
+		return true
+	})
 	if len(accounts) == 0 {
 		accounts = nil
 	}

@@ -11,7 +11,12 @@ import (
 
 	"sync"
 
+	"time"
+
+	"fmt"
+
 	ch "github.com/viteshan/naive-vite/chain"
+	"github.com/viteshan/naive-vite/version"
 )
 
 type BlockPool interface {
@@ -20,6 +25,7 @@ type BlockPool interface {
 	Start()
 	Stop()
 	Init(syncer.Fetcher)
+	Info(string) string
 }
 
 type pool struct {
@@ -33,19 +39,23 @@ type pool struct {
 
 	rwMutex *sync.RWMutex
 	acMu    sync.Mutex
+	version *version.Version
+
+	closed chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewPool(bc ch.BlockChain, rwMutex *sync.RWMutex) BlockPool {
-	self := &pool{bc: bc, rwMutex: rwMutex}
+	self := &pool{bc: bc, rwMutex: rwMutex, version: &version.Version{}, closed: make(chan struct{})}
 	return self
 }
 
 func (self *pool) Init(f syncer.Fetcher) {
-	self.snapshotVerifier = verifier.NewSnapshotVerifier(self.bc)
-	self.accountVerifier = verifier.NewAccountVerifier(self.bc)
+	self.snapshotVerifier = verifier.NewSnapshotVerifier(self.bc, self.version)
+	self.accountVerifier = verifier.NewAccountVerifier(self.bc, self.version)
 	self.fetcher = f
-	snapshotPool := newSnapshotPool("snapshotPool")
-	snapshotPool.init(&snapshotCh{self.bc},
+	snapshotPool := newSnapshotPool("snapshotPool", self.version)
+	snapshotPool.init(&snapshotCh{self.bc, self.version},
 		self.snapshotVerifier,
 		NewFetcher("", self.fetcher),
 		self.rwMutex,
@@ -53,34 +63,69 @@ func (self *pool) Init(f syncer.Fetcher) {
 
 	self.pendingSc = snapshotPool
 }
+func (self *pool) Info(id string) string {
+	if id == "" {
+		bp := self.pendingSc.blockpool
+		cp := self.pendingSc.chainpool
+
+		freeSize := len(bp.freeBlocks)
+		compoundSize := len(bp.compoundBlocks)
+		snippetSize := len(cp.snippetChains)
+		currentLen := cp.current.size()
+		chainSize := len(cp.chains)
+		return fmt.Sprintf("freeSize:%d, compoundSize:%d, snippetSize:%d, currentLen:%d, chainSize:%d",
+			freeSize, compoundSize, snippetSize, currentLen, chainSize)
+	} else {
+		ac := self.selfPendingAc(id)
+		if ac == nil {
+			return "pool not exist."
+		}
+		bp := ac.blockpool
+		cp := ac.chainpool
+
+		freeSize := len(bp.freeBlocks)
+		compoundSize := len(bp.compoundBlocks)
+		snippetSize := len(cp.snippetChains)
+		currentLen := cp.current.size()
+		chainSize := len(cp.chains)
+		return fmt.Sprintf("freeSize:%d, compoundSize:%d, snippetSize:%d, currentLen:%d, chainSize:%d",
+			freeSize, compoundSize, snippetSize, currentLen, chainSize)
+	}
+}
 func (self *pool) Start() {
 	self.pendingSc.Start()
+	go self.loop()
 }
 func (self *pool) Stop() {
 	self.pendingSc.Stop()
-	self.pendingAc.Range(func(k, v interface{}) bool {
-		p := v.(*accountPool)
-		p.Stop()
-		return true
-	})
+	close(self.closed)
+	self.wg.Wait()
 }
 
 func (self *pool) AddSnapshotBlock(block *common.SnapshotBlock) error {
+	log.Info("receive snapshot block from network. height:%d, hash:%s.", block.Height(), block.Hash())
 	self.pendingSc.AddBlock(block)
 	return nil
 }
 
 func (self *pool) AddDirectSnapshotBlock(block *common.SnapshotBlock) error {
+	self.rwMutex.RLock()
+	defer self.rwMutex.RUnlock()
 	return self.pendingSc.AddDirectBlock(block)
 }
 
 func (self *pool) AddAccountBlock(address string, block *common.AccountStateBlock) error {
+	log.Info("receive account block from network. addr:%s, height:%d, hash:%s.", address, block.Height(), block.Hash())
 	self.selfPendingAc(address).AddBlock(block)
 	return nil
 }
 
 func (self *pool) AddDirectAccountBlock(address string, block *common.AccountStateBlock) error {
-	return self.selfPendingAc(address).AddDirectBlock(block)
+	self.rwMutex.RLock()
+	defer self.rwMutex.RUnlock()
+	ac := self.selfPendingAc(address)
+	return ac.AddDirectBlock(block)
+
 }
 
 func (self *pool) ExistInPool(address string, requestHash string) bool {
@@ -240,9 +285,8 @@ func (self *pool) selfPendingAc(addr string) *accountPool {
 		return chain.(*accountPool)
 	}
 
-	p := newAccountPool("accountChainPool-"+addr, &accountCh{address: addr, bc: self.bc})
+	p := newAccountPool("accountChainPool-"+addr, &accountCh{addr, self.bc, self.version}, self.version)
 	p.Init(self.accountVerifier, NewFetcher(addr, self.fetcher), self.rwMutex.RLocker())
-	p.Start()
 
 	self.acMu.Lock()
 	defer self.acMu.Unlock()
@@ -253,4 +297,40 @@ func (self *pool) selfPendingAc(addr string) *accountPool {
 	self.pendingAc.Store(addr, p)
 	return p
 
+}
+func (self *pool) loop() {
+	self.wg.Add(1)
+	defer self.wg.Done()
+
+	t := time.NewTicker(time.Millisecond * 500)
+	sum := 0
+	for {
+		select {
+		case <-self.closed:
+			return
+		case <-t.C:
+			if sum == 0 {
+				time.Sleep(time.Millisecond * 100)
+			}
+			sum = 0
+
+			sum += self.loopAccounts()
+		default:
+			sum += self.loopAccounts()
+		}
+	}
+}
+
+func (self *pool) loopAccounts() int {
+	sum := 0
+	var pendings []*accountPool
+	self.pendingAc.Range(func(_, v interface{}) bool {
+		p := v.(*accountPool)
+		pendings = append(pendings, p)
+		return true
+	})
+	for _, p := range pendings {
+		sum = sum + p.loop()
+	}
+	return sum
 }

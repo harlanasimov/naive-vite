@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strconv"
 
+	"fmt"
+
 	"github.com/golang-collections/collections/stack"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
@@ -144,16 +146,31 @@ func (self *accountChain) SnapshotPoint(snapshotHeight int, snapshotHash string,
 	if head == nil {
 		return errors.New("account[" + self.address + "] not exist.")
 	}
-	if h.Hash == head.Hash() && h.Height == head.Height() {
+
+	var lastPoint *common.SnapshotPoint
+	p := self.snapshotPoint.Peek()
+	if p != nil {
+		lastPoint = p.(*common.SnapshotPoint)
+		if snapshotHeight <= lastPoint.SnapshotHeight ||
+			h.Height < lastPoint.AccountHeight {
+			errMsg := fmt.Sprintf("acount snapshot point check fail.sHeight:[%d], lastSHeight:[%d], aHeight:[%d], lastAHeight:[%d]",
+				snapshotHeight, lastPoint.SnapshotHeight, h.Height, lastPoint.AccountHeight)
+			return errors.New(errMsg)
+		}
+	}
+
+	point := self.GetBlockByHeight(h.Height)
+	if h.Hash == point.Hash() && h.Height == point.Height() {
 		point := &common.SnapshotPoint{SnapshotHeight: snapshotHeight, SnapshotHash: snapshotHash, AccountHash: h.Hash, AccountHeight: h.Height}
 		self.snapshotPoint.Push(point)
 		return nil
+	} else {
+		errMsg := "account[" + self.address + "] state error. accHeight: " + strconv.Itoa(h.Height) +
+			"accHash:" + h.Hash +
+			" expAccHeight:" + strconv.Itoa(point.Height()) +
+			" expAccHash:" + point.Hash()
+		return errors.New(errMsg)
 	}
-	errMsg := "account[] state error. accHeight: " + strconv.Itoa(h.Height) +
-		"accHash:" + h.Hash +
-		" expAccHeight:" + strconv.Itoa(head.Height()) +
-		" expAccHash:" + head.Hash()
-	return errors.New(errMsg)
 }
 
 //SnapshotPoint

@@ -4,7 +4,10 @@ import (
 	"sync"
 	"time"
 
+	"strconv"
+
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
@@ -62,13 +65,13 @@ func (self *defaultRetryPolicy) retry(hash string) bool {
 		status.inc()
 		if status.done {
 			// cnt>5 && now - dtime > 10s
-			if status.cnt > 5 && now.After(status.dtime.Add(time.Second*10)) {
+			if status.cnt > 5 && now.After(status.dtime.Add(time.Second*3)) {
 				status.reset()
 				return true
 			}
 		} else {
 			// cnt>5 && now - ftime > 5s
-			if status.cnt > 10 && now.After(status.ftime.Add(time.Second*5)) {
+			if status.cnt > 10 && now.After(status.ftime.Add(time.Second*2)) {
 				status.reset()
 				return true
 			}
@@ -97,10 +100,33 @@ func (self *fetcher) fetchSnapshotBlockFromPeer(hash common.HashHeight, peer p2p
 }
 
 func (self *fetcher) FetchAccount(address string, hash common.HashHeight, prevCnt int) {
-	self.sender.RequestAccountHash(address, hash, prevCnt)
+	if prevCnt <= 0 {
+		return
+	}
+	if self.retryPolicy.retry(hash.Hash + strconv.Itoa(hash.Height)) {
+		self.sender.RequestAccountHash(address, hash, prevCnt)
+	}
+}
+func (self *fetcher) Fetch(request face.FetchRequest) {
+	if request.PrevCnt <= 0 {
+		return
+	}
+	if self.retryPolicy.retry(request.Hash + strconv.Itoa(request.Height)) {
+		hashH := common.HashHeight{Hash: request.Hash, Height: request.Height}
+		if request.Chain == "" {
+			self.sender.RequestSnapshotHash(hashH, request.PrevCnt)
+		} else {
+			self.sender.RequestAccountHash(request.Chain, hashH, request.PrevCnt)
+		}
+	}
 }
 func (self *fetcher) FetchSnapshot(hash common.HashHeight, prevCnt int) {
-	self.sender.RequestSnapshotHash(hash, prevCnt)
+	if prevCnt <= 0 {
+		return
+	}
+	if self.retryPolicy.retry(hash.Hash + strconv.Itoa(hash.Height)) {
+		self.sender.RequestSnapshotHash(hash, prevCnt)
+	}
 }
 
 func (self *fetcher) fetchSnapshotBlockByHash(tasks []common.HashHeight) {

@@ -11,8 +11,9 @@ import (
 )
 
 type closeOnce struct {
-	closed chan struct{}
-	once   sync.Once
+	closed  chan struct{}
+	once    sync.Once
+	writeCh chan []byte
 }
 
 type peer struct {
@@ -24,6 +25,7 @@ type peer struct {
 	remoteAddr  net.Addr
 	loopWg      sync.WaitGroup
 	state       interface{}
+	mu          sync.Mutex
 }
 
 func (self *peer) SetState(s interface{}) {
@@ -42,7 +44,7 @@ func (self *peer) Write(msg *Msg) error {
 		log.Error("serialize msg fail. err:%v, msg:%v", err, msg)
 		return err
 	}
-	self.conn.WriteMessage(websocket.BinaryMessage, byt)
+	self.writeCh <- byt
 	return nil
 }
 
@@ -59,6 +61,7 @@ func (self *peer) close() {
 }
 func (self *peer) realClose() {
 	close(self.closed)
+	close(self.writeCh)
 	self.conn.Close()
 }
 
@@ -96,6 +99,7 @@ func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Con
 	remoteAddr := conn.RemoteAddr()
 	peer := &peer{peerId: fromId, selfId: toId, peerSrvAddr: peerSrvAddr, conn: conn, remoteAddr: remoteAddr, state: s}
 	peer.closed = make(chan struct{})
+	peer.writeCh = make(chan []byte, 1000)
 	conn.SetCloseHandler(func(code int, text string) error {
 		log.Info("peer received closed msg. %s, %v", peer.info(), remoteAddr)
 		return c(code, text)
@@ -105,4 +109,22 @@ func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Con
 
 func (self *peer) info() string {
 	return "[" + self.selfId + "]-[" + self.peerId + "]"
+}
+
+func (self *peer) loopWrite() {
+	self.loopWg.Add(1)
+	defer self.loopWg.Done()
+	defer self.close()
+
+	for {
+		select {
+		case m, ok := <-self.writeCh:
+			if ok {
+				self.conn.WriteMessage(websocket.BinaryMessage, m)
+			}
+		case <-self.closed:
+			log.Warn("peer[%s] write closed.", self.peerId)
+			return
+		}
+	}
 }

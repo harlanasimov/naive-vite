@@ -111,8 +111,10 @@ func (self *node) StartMiner() {
 }
 
 func (self *node) StopMiner() {
-	self.miner.Stop()
-	log.Info("miner stopped...")
+	if self.miner != nil {
+		self.miner.Stop()
+		log.Info("miner stopped...")
+	}
 }
 
 func (self *node) Leger() ledger.Ledger {

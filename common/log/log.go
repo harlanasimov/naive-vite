@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func init() {
+func InitPath() {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)

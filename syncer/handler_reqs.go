@@ -8,6 +8,19 @@ import (
 	"github.com/viteshan/naive-vite/p2p"
 )
 
+func split(buf []common.HashHeight, lim int) [][]common.HashHeight {
+	var chunk []common.HashHeight
+	chunks := make([][]common.HashHeight, 0, len(buf)/lim+1)
+	for len(buf) >= lim {
+		chunk, buf = buf[:lim], buf[lim:]
+		chunks = append(chunks, chunk)
+	}
+	if len(buf) > 0 {
+		chunks = append(chunks, buf[:len(buf)])
+	}
+	return chunks
+}
+
 type reqAccountHashHandler struct {
 	MsgHandler
 	aReader *chainRw
@@ -43,7 +56,13 @@ func (self *reqAccountHashHandler) Handle(t common.NetMsgType, d []byte, p p2p.P
 	if len(hashes) == 0 {
 		return
 	}
-	self.sender.SendAccountHashes(msg.Address, hashes, p)
+	log.Info("send account hashes, address:%s, hashSize:%d, PId:%s", msg.Address, len(hashes), p.Id())
+	m := split(hashes, 1000)
+
+	for _, m1 := range m {
+		self.sender.SendAccountHashes(msg.Address, m1, p)
+		log.Info("send account hashes, address:%s, hashSize:%d, PId:%s", msg.Address, len(m1), p.Id())
+	}
 }
 
 func (self *reqAccountHashHandler) Id() string {
@@ -123,6 +142,7 @@ func (self *reqAccountBlocksHandler) Handle(t common.NetMsgType, d []byte, p p2p
 		blocks = append(blocks, block)
 	}
 	if len(blocks) > 0 {
+		log.Info("send account blocks, address:%s, blockSize:%d, PId:%s", msg.Address, len(blocks), p.Id())
 		self.sender.SendAccountBlocks(msg.Address, blocks, p)
 	}
 }

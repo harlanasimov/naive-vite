@@ -1,6 +1,10 @@
 package ledger
 
-import "github.com/viteshan/naive-vite/common"
+import (
+	"sync"
+
+	"github.com/viteshan/naive-vite/common"
+)
 
 // just only unreceived transactions
 
@@ -14,6 +18,7 @@ type Req struct {
 
 type reqPool struct {
 	accounts map[string]*reqAccountPool
+	rw       sync.RWMutex
 }
 
 func (self *reqPool) SnapshotInsertCallback(block *common.SnapshotBlock) {
@@ -43,9 +48,16 @@ func newReqPool() *reqPool {
 }
 
 func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
+	self.rw.Lock()
+	defer self.rw.Unlock()
 	if block.BlockType == common.SEND {
 		req := &Req{ReqHash: block.Hash(), state: 2, From: block.From, Amount: block.ModifiedAmount}
-		self.account(block.To).reqs[req.ReqHash] = req
+		account := self.account(block.To)
+		if account == nil {
+			account = &reqAccountPool{reqs: make(map[string]*Req)}
+			self.accounts[block.To] = account
+		}
+		account.reqs[req.ReqHash] = req
 	} else if block.BlockType == common.RECEIVED {
 		//delete(self.account(block.To).reqs, block.SourceHash)
 		req := self.getReq(block.To, block.SourceHash)
@@ -55,6 +67,8 @@ func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
 }
 
 func (self *reqPool) blockRollback(block *common.AccountStateBlock) {
+	self.rw.Lock()
+	defer self.rw.Unlock()
 	if block.BlockType == common.SEND {
 		//delete(self.account(block.To).reqs, block.Hash())
 		self.getReq(block.To, block.Hash()).state = 0
@@ -67,16 +81,17 @@ func (self *reqPool) blockRollback(block *common.AccountStateBlock) {
 
 func (self *reqPool) account(address string) *reqAccountPool {
 	pool := self.accounts[address]
-	if pool == nil {
-		pool = &reqAccountPool{reqs: make(map[string]*Req)}
-		self.accounts[address] = pool
-	}
 	return pool
 }
 
 func (self *reqPool) getReqs(address string) []*Req {
+	self.rw.RLock()
+	defer self.rw.RUnlock()
 	account := self.account(address)
 	var result []*Req
+	if account == nil {
+		return result
+	}
 	for _, req := range account.reqs {
 		if req.state != 1 {
 			result = append(result, req)
@@ -86,6 +101,9 @@ func (self *reqPool) getReqs(address string) []*Req {
 }
 func (self *reqPool) getReq(address string, sourceHash string) *Req {
 	account := self.account(address)
+	if account == nil {
+		return nil
+	}
 	return account.reqs[sourceHash]
 }
 

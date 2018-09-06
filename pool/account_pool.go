@@ -3,29 +3,25 @@ package pool
 import (
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/verifier"
+	"github.com/viteshan/naive-vite/version"
 )
 
 type accountPool struct {
 	BCPool
-	mu     sync.Locker
-	closed chan struct{}
-	wg     sync.WaitGroup
-	rw     *accountCh
+	mu         sync.Locker
+	rw         *accountCh
+	verifyTask verifier.Task
 }
 
-func newAccountPool(name string, rw *accountCh) *accountPool {
+func newAccountPool(name string, rw *accountCh, v *version.Version) *accountPool {
 	pool := &accountPool{}
 	pool.Id = name
-	pool.closed = make(chan struct{})
-	pool.verifierFailcallback = pool.insertAccountFailCallback
-	pool.verifierSuccesscallback = pool.insertAccountSuccessCallback
 	pool.rw = rw
+	pool.version = v
 	return pool
 }
 
@@ -95,85 +91,98 @@ func (self *accountPool) FindRollbackPointForAccountHashH(height int, hash strin
 	return true, forkPoint.(*common.AccountStateBlock), chain, nil
 }
 
-func (self *accountPool) loop() {
-	defer self.wg.Done()
-	for {
-		select {
-		case <-self.closed:
-			return
-		default:
-			self.LoopGenSnippetChains()
-			self.LoopAppendChains()
-			self.LoopFetchForSnippets()
-			self.loopCheckCurrentInsert()
-			time.Sleep(time.Second)
-		}
-	}
+func (self *accountPool) loop() int {
+	sum := 0
+	sum = sum + self.loopGenSnippetChains()
+	sum = sum + self.loopAppendChains()
+	sum = sum + self.loopFetchForSnippets()
+	sum = sum + self.loopAccountTryInsert()
+	return sum
 }
 
-func (self *accountPool) loopCheckCurrentInsert() {
-	if self.chainpool.current.size() == 0 {
-		return
+func (self *accountPool) loopAccountTryInsert() int {
+	if self.chainpool.current.size() <= 0 {
+		return 0
+	}
+	if self.verifyTask != nil && !self.verifyTask.Done() {
+		return 0
 	}
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	self.CheckCurrentInsert()
+	sum := self.accountTryInsert()
+	if sum > 0 && self.verifyTask != nil {
+		reqs := self.verifyTask.Requests()
+		self.syncer.fetchReqs(reqs)
+	}
+	return sum
 }
 
-func (self *accountPool) accountTryInsert() {
+/**
+1. fail    something is wrong.
+2. pending
+	2.1 pending for snapshot
+	2.2 pending for other account chain(specific block height)
+3. success
+
+
+
+fail: If no fork version increase, don't do anything.
+pending:
+	pending(2.1): If snapshot height is not reached, don't do anything.
+	pending(2.2): If other account chain height is not reached, don't do anything.
+success:
+	really insert to chain.
+*/
+func (self *accountPool) accountTryInsert() int {
+	self.rMu.Lock()
+	defer self.rMu.Unlock()
 	cp := self.chainpool
 	current := cp.current
 	minH := current.tailHeight + 1
 	headH := current.headHeight
+	n := 0
 L:
 	for i := minH; i <= headH; i++ {
 		wrapper := current.getBlock(i, false)
 		block := wrapper.block
-		stat := wrapper.verifyStat
-		//if !wrapper.checkForkVersion() {
 		wrapper.reset()
-		//}
-		tools.CalculateAccountHash()
-		cp.verifier.VerifyReferred(block, stat)
+		n++
+		stat, task := cp.verifier.VerifyReferred(block)
 		if !wrapper.checkForkVersion() {
 			wrapper.reset()
-			continue
+			break L
 		}
 		result := stat.VerifyResult()
 		switch result {
 		case verifier.PENDING:
-
+			self.verifyTask = task
+			break L
 		case verifier.FAIL:
-			log.Error("forkedChain forked. verify result is %s. block info:account[%s],hash[%s],height[%d]",
+			log.Error("account block verify fail. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
-			if verifierFailcallback != nil {
-				verifierFailcallback(block, stat)
-			}
+			self.verifyTask = task
 			break L
 		case verifier.SUCCESS:
+			self.verifyTask = nil
 			if block.Height() == current.tailHeight+1 {
 				err := cp.writeToChain(current, wrapper)
-				if err == nil && insertSuccessCallback != nil {
-					insertSuccessCallback(block, stat)
+				if err != nil {
+					log.Error("account block write fail. block info:account[%s],hash[%s],height[%d], err:%v",
+						result, block.Signer(), block.Hash(), block.Height(), err)
+					break L
 				}
+			} else {
+				break L
 			}
 		default:
-			log.Error("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
+			// shutdown process
+			log.Fatal("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
+			break L
 		}
 	}
-}
 
-func (self *accountPool) Start() {
-	self.wg.Add(1)
-	go self.loop()
-	log.Info("account_pool[%s] started", self.Id)
-}
-
-func (self *accountPool) Stop() {
-	close(self.closed)
-	self.wg.Wait()
-	log.Info("account_pool[%s] stopped", self.Id)
+	return n
 }
 
 func (self *accountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {

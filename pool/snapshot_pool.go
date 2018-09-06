@@ -19,11 +19,10 @@ type snapshotPool struct {
 	pool   *pool
 }
 
-func newSnapshotPool(name string) *snapshotPool {
+func newSnapshotPool(name string, v *version.Version) *snapshotPool {
 	pool := &snapshotPool{}
 	pool.Id = name
-	pool.verifierFailcallback = pool.insertSnapshotFailCallback
-	pool.verifierSuccesscallback = pool.insertSnapshotSuccessCallback
+	pool.version = v
 	pool.closed = make(chan struct{})
 	return pool
 }
@@ -99,7 +98,7 @@ func (self *snapshotPool) snapshotFork(longest Chain, current Chain) {
 		log.Error("snapshot modify current fail. err:%v", err)
 		return
 	}
-	version.IncForkVersion()
+	self.version.Inc()
 }
 
 func (self *snapshotPool) loop() {
@@ -109,23 +108,25 @@ func (self *snapshotPool) loop() {
 		case <-self.closed:
 			return
 		default:
-			self.LoopGenSnippetChains()
-			self.LoopAppendChains()
-			self.LoopFetchForSnippets()
+			self.loopGenSnippetChains()
+			self.loopAppendChains()
+			self.loopFetchForSnippets()
 			self.loopCheckCurrentInsert()
-			time.Sleep(time.Second)
+			time.Sleep(200 * time.Millisecond)
 		}
-
 	}
 }
 
 func (self *snapshotPool) loopCheckCurrentInsert() {
+	if self.chainpool.current.size() == 0 {
+		return
+	}
 	self.rwMu.RLock()
 	defer self.rwMu.RUnlock()
-	self.checkSnapshot()
+	self.snapshotTryInsert()
 }
 
-func (self *snapshotPool) checkSnapshot() {
+func (self *snapshotPool) snapshotTryInsert() {
 	pool := self.chainpool
 	current := pool.current
 	minH := current.tailHeight + 1
@@ -134,11 +135,11 @@ L:
 	for i := minH; i <= headH; i++ {
 		wrapper := current.getBlock(i, false)
 		block := wrapper.block
-		stat := wrapper.verifyStat
-		//if !wrapper.checkForkVersion() {
-		wrapper.reset()
-		//}
-		pool.verifier.VerifyReferred(block, stat)
+
+		if !wrapper.checkForkVersion() {
+			wrapper.reset()
+		}
+		stat, _ := pool.verifier.VerifyReferred(block)
 		if !wrapper.checkForkVersion() {
 			wrapper.reset()
 			continue
@@ -146,22 +147,28 @@ L:
 		result := stat.VerifyResult()
 		switch result {
 		case verifier.PENDING:
-			self.snapshotPendingCallback(block, stat)
+			self.insertVerifyPending(block, stat)
+			break L
 		case verifier.FAIL:
-			log.Error("forkedChain forked. verify result is %s. block info:account[%s],hash[%s],height[%d]",
-				result, block.Signer(), block.Hash(), block.Height())
-			self.insertSnapshotFailCallback(block, stat)
+			log.Error("snapshot verify fail. block info:hash[%s],height[%d], %s",
+				result, block.Hash(), block.Height(), stat.ErrMsg())
+			self.insertVerifyFail(block, stat)
 			break L
 		case verifier.SUCCESS:
 			if block.Height() == current.tailHeight+1 {
 				err := pool.writeToChain(current, wrapper)
-				if err == nil {
-					self.insertSnapshotSuccessCallback(block, stat)
+				if err != nil {
+					log.Error("insert snapshot chain fail. block info:hash[%s],height[%d], err:%v",
+						block.Hash(), block.Height(), err)
+					break L
 				}
+			} else {
+				break L
 			}
 		default:
-			log.Error("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
+			log.Fatal("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
+			break L
 		}
 	}
 }
@@ -178,7 +185,7 @@ func (self *snapshotPool) Stop() {
 	log.Info("snapshot_pool[%s] stopped.", self.Id)
 }
 
-func (self *snapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.BlockVerifyStat) {
+func (self *snapshotPool) insertVerifyFail(b common.Block, s verifier.BlockVerifyStat) {
 	block := b.(*common.SnapshotBlock)
 	stat := s.(*verifier.SnapshotBlockVerifyStat)
 	results := stat.Results()
@@ -189,9 +196,10 @@ func (self *snapshotPool) insertSnapshotFailCallback(b common.Block, s verifier.
 			self.pool.ForkAccountTo(account)
 		}
 	}
+	self.version.Inc()
 }
 
-func (self *snapshotPool) snapshotPendingCallback(b common.Block, s verifier.BlockVerifyStat) {
+func (self *snapshotPool) insertVerifyPending(b common.Block, s verifier.BlockVerifyStat) {
 	block := b.(*common.SnapshotBlock)
 	stat := s.(*verifier.SnapshotBlockVerifyStat)
 	results := stat.Results()
@@ -204,13 +212,6 @@ func (self *snapshotPool) snapshotPendingCallback(b common.Block, s verifier.Blo
 	}
 }
 
-func (self *snapshotPool) insertSnapshotSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
-	//block := b.(*common.SnapshotBlock)
-	//
-	//for _, account := range block.Accounts {
-	//	self.pool.SnapshotAccount(block, account)
-	//}
-}
 func (self *snapshotPool) getUnlockAccountSnapshot(block *common.SnapshotBlock) (map[string]*common.SnapshotPoint, map[string]*common.SnapshotPoint) {
 	h := self.chainpool.diskChain.Head()
 	head := h.(*common.SnapshotBlock)

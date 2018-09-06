@@ -5,6 +5,8 @@ import (
 
 	"strconv"
 
+	"encoding/json"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/store"
@@ -77,8 +79,13 @@ func (self *snapshotChain) getBlockByHash(hash string) *common.SnapshotBlock {
 	return block
 }
 
+func j(v interface{}) string {
+	bytes, _ := json.Marshal(v)
+	return string(bytes)
+}
+
 func (self *snapshotChain) insertChain(block *common.SnapshotBlock) error {
-	log.Info("insert to snapshot Chain: %v", block)
+	log.Info("insert to snapshot Chain: %s", j(block))
 	self.store.PutSnapshot(block)
 	self.head = block
 	self.store.SetSnapshotHead(&common.HashHeight{Hash: block.Hash(), Height: block.Height()})

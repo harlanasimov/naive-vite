@@ -2,6 +2,7 @@ package pool
 
 import (
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/syncer"
 )
 
@@ -20,9 +21,14 @@ func NewFetcher(address string, f syncer.Fetcher) *fetcher {
 }
 
 func (self *fetcher) fetch(hashHeight common.HashHeight, prevCnt int) {
-	if self.address == "" {
-		self.fetcher.FetchSnapshot(hashHeight, prevCnt)
-	} else {
-		self.fetcher.FetchAccount(self.address, hashHeight, prevCnt)
+	self.fetcher.Fetch(face.FetchRequest{Hash: hashHeight.Hash, Height: hashHeight.Height, PrevCnt: prevCnt, Chain: self.address})
+}
+
+func (self *fetcher) fetchRequest(request face.FetchRequest) {
+	self.fetcher.Fetch(request)
+}
+func (self *fetcher) fetchReqs(reqs []face.FetchRequest) {
+	for _, r := range reqs {
+		self.fetcher.Fetch(r)
 	}
 }
