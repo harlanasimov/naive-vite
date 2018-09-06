@@ -12,6 +12,7 @@ import (
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/node"
 	"github.com/viteshan/naive-vite/p2p"
 )
@@ -532,6 +533,22 @@ func main() {
 		shell.AddCmd(autoCmd)
 	}
 
+	{
+		autoCmd := &ishell.Cmd{
+			Name: "monitor",
+			Help: "print stat info.",
+		}
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "stat",
+			Help: "print monitor stat info.",
+			Func: func(c *ishell.Context) {
+				c.Println(monitor.Stat())
+			},
+		})
+
+		shell.AddCmd(autoCmd)
+	}
+
 	// run shell
 	shell.Run()
 }
@@ -571,4 +588,5 @@ func startBoot(bootAddr string) p2p.Boot {
 - ablock[list,head,reqs]
 - sblock[list,head,detail]
 - pool[sprint,aprint]
+- monitor[stat]
 */

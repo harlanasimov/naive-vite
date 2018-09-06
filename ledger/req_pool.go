@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/monitor"
 )
 
 // just only unreceived transactions
@@ -30,6 +31,7 @@ func (self *reqPool) SnapshotRemoveCallback(block *common.SnapshotBlock) {
 }
 
 func (self *reqPool) AccountInsertCallback(address string, block *common.AccountStateBlock) {
+	monitor.LogEvent("chain", "account")
 	self.blockInsert(block)
 }
 
