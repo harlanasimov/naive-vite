@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	ch "github.com/viteshan/naive-vite/chain"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/version"
 )
 
@@ -94,7 +95,8 @@ func (self *pool) Info(id string) string {
 }
 func (self *pool) Start() {
 	self.pendingSc.Start()
-	go self.loop()
+	go self.loopTryInsert()
+	go self.loopCompact()
 }
 func (self *pool) Stop() {
 	self.pendingSc.Stop()
@@ -298,11 +300,11 @@ func (self *pool) selfPendingAc(addr string) *accountPool {
 	return p
 
 }
-func (self *pool) loop() {
+func (self *pool) loopTryInsert() {
 	self.wg.Add(1)
 	defer self.wg.Done()
 
-	t := time.NewTicker(time.Millisecond * 500)
+	t := time.NewTicker(time.Millisecond * 20)
 	sum := 0
 	for {
 		select {
@@ -310,18 +312,62 @@ func (self *pool) loop() {
 			return
 		case <-t.C:
 			if sum == 0 {
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(time.Millisecond * 10)
+				monitor.LogEvent("pool", "tryInsertSleep")
 			}
 			sum = 0
-
-			sum += self.loopAccounts()
+			sum += self.accountsTryInsert()
 		default:
-			sum += self.loopAccounts()
+			sum += self.accountsTryInsert()
 		}
 	}
 }
 
-func (self *pool) loopAccounts() int {
+func (self *pool) accountsTryInsert() int {
+	monitor.LogEvent("pool", "tryInsert")
+	sum := 0
+	var pending []*accountPool
+	self.pendingAc.Range(func(_, v interface{}) bool {
+		p := v.(*accountPool)
+		pending = append(pending, p)
+		return true
+	})
+	var tasks []verifier.Task
+	for _, p := range pending {
+		task := p.TryInsert()
+		if task != nil {
+			self.fetchForTask(task)
+			tasks = append(tasks, task)
+			sum = sum + 1
+		}
+	}
+	return sum
+}
+
+func (self *pool) loopCompact() {
+	self.wg.Add(1)
+	defer self.wg.Done()
+
+	t := time.NewTicker(time.Millisecond * 40)
+	sum := 0
+	for {
+		select {
+		case <-self.closed:
+			return
+		case <-t.C:
+			if sum == 0 {
+				time.Sleep(time.Millisecond * 20)
+			}
+			sum = 0
+
+			sum += self.accountsCompact()
+		default:
+			sum += self.accountsCompact()
+		}
+	}
+}
+
+func (self *pool) accountsCompact() int {
 	sum := 0
 	var pendings []*accountPool
 	self.pendingAc.Range(func(_, v interface{}) bool {
@@ -330,7 +376,31 @@ func (self *pool) loopAccounts() int {
 		return true
 	})
 	for _, p := range pendings {
-		sum = sum + p.loop()
+		sum = sum + p.Compact()
 	}
 	return sum
+}
+func (self *pool) fetchForTask(task verifier.Task) []*face.FetchRequest {
+	reqs := task.Requests()
+	if len(reqs) <= 0 {
+		return nil
+	}
+	// if something in pool, deal with it.
+	var existReqs []*face.FetchRequest
+	for _, r := range reqs {
+		exist := false
+		if r.Chain == "" {
+			exist = self.pendingSc.ExistInCurrent(r)
+		} else {
+			exist = self.selfPendingAc(r.Chain).ExistInCurrent(r)
+		}
+
+		if !exist {
+			self.fetcher.Fetch(r)
+		} else {
+			log.Info("block[%s] exist, should not fetch.", r.String())
+			existReqs = append(existReqs, &r)
+		}
+	}
+	return existReqs
 }

@@ -31,7 +31,7 @@ func (self *reqPool) SnapshotRemoveCallback(block *common.SnapshotBlock) {
 }
 
 func (self *reqPool) AccountInsertCallback(address string, block *common.AccountStateBlock) {
-	monitor.LogEvent("chain", "account")
+	monitor.LogEvent("chain", "insert")
 	self.blockInsert(block)
 }
 

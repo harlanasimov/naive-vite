@@ -7,6 +7,8 @@ import (
 
 	"net"
 
+	"net/http"
+
 	"github.com/abiosoft/ishell"
 	"github.com/google/gops/agent"
 	"github.com/viteshan/naive-vite/common/config"
@@ -15,6 +17,9 @@ import (
 	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/node"
 	"github.com/viteshan/naive-vite/p2p"
+)
+import (
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -437,6 +442,27 @@ func main() {
 				}
 			},
 		})
+
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "detail",
+			Help: "detail for account block.",
+			Func: func(c *ishell.Context) {
+				if node == nil {
+					c.Println("node should be stopped.")
+					return
+				}
+				height := -1
+				addr := node.Wallet().CoinBase()
+				if len(c.Args) == 2 {
+					addr = c.Args[0]
+					height, _ = strconv.Atoi(c.Args[1])
+				}
+				block := node.Leger().Chain().GetAccountByHeight(addr, height)
+				bytes, _ := json.Marshal(block)
+				c.Printf("detail info, block:%s\n", string(bytes))
+			},
+		})
+
 		shell.AddCmd(autoCmd)
 	}
 
@@ -542,7 +568,35 @@ func main() {
 			Name: "stat",
 			Help: "print monitor stat info.",
 			Func: func(c *ishell.Context) {
-				c.Println(monitor.Stat())
+				stat := monitor.Stat()
+				for k, v := range stat {
+					if v.Cnt > 0 {
+						c.Printf("%s\t, %d, %f", k, v.Cnt, float64(float64(v.Sum)/float64(v.Cnt)))
+						c.Println()
+					}
+				}
+			},
+		})
+
+		shell.AddCmd(autoCmd)
+	}
+
+	{
+		autoCmd := &ishell.Cmd{
+			Name: "profile",
+			Help: "profile.",
+		}
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "start",
+			Help: "print monitor stat info.",
+			Func: func(c *ishell.Context) {
+				port := "6060"
+				if len(c.Args) == 1 {
+					port = c.Args[0]
+				}
+				go func() {
+					http.ListenAndServe("localhost:"+port, nil)
+				}()
 			},
 		})
 
@@ -585,8 +639,9 @@ func startBoot(bootAddr string) p2p.Boot {
 
 
 - account[list,create,balance,send,receive]
-- ablock[list,head,reqs]
+- ablock[list,head,reqs,detail]
 - sblock[list,head,detail]
 - pool[sprint,aprint]
 - monitor[stat]
+- profile[start]
 */

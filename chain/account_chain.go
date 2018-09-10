@@ -6,10 +6,13 @@ import (
 
 	"fmt"
 
+	"time"
+
 	"github.com/golang-collections/collections/stack"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/store"
 )
 
@@ -67,11 +70,16 @@ func (self *accountChain) GetBlockByHash(hash string) *common.AccountStateBlock 
 }
 
 func (self *accountChain) insertChain(block *common.AccountStateBlock) error {
+	defer monitor.LogTime("chain", "accountInsert", time.Now())
 	log.Info("insert to account Chain: %v", block)
 	self.store.PutAccount(self.address, block)
 	self.head = block
 	self.listener.AccountInsertCallback(self.address, block)
 	self.store.SetAccountHead(self.address, &common.HashHeight{Hash: block.Hash(), Height: block.Height()})
+
+	if block.BlockType == common.RECEIVED {
+		self.store.PutSourceHash(block.SourceHash, block)
+	}
 	return nil
 }
 func (self *accountChain) removeChain(block *common.AccountStateBlock) error {
@@ -89,6 +97,9 @@ func (self *accountChain) removeChain(block *common.AccountStateBlock) error {
 		self.store.SetAccountHead(self.address, nil)
 	} else {
 		self.store.SetAccountHead(self.address, &common.HashHeight{Hash: head.Hash(), Height: head.Height()})
+	}
+	if block.BlockType == common.RECEIVED {
+		self.store.DeleteSourceHash(block.SourceHash)
 	}
 	return nil
 }
@@ -109,7 +120,6 @@ func (self *accountChain) getBySourceBlock(sourceHash string) *common.AccountSta
 	if self.head == nil {
 		return nil
 	}
-
 	height := self.head.Height()
 	for i := height; i > 0; i-- {
 		// first block(i==0) is create block

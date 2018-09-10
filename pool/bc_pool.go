@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
@@ -48,7 +49,7 @@ type BCPool struct {
 
 	version  *version.Version
 	verifier verifier.Verifier
-	rMu      sync.Mutex
+	rMu      sync.Mutex // direct add and loop insert
 }
 
 type blockPool struct {
@@ -727,9 +728,7 @@ func (a ByTailHeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByTailHeight) Less(i, j int) bool { return a[i].tailHeight < a[j].tailHeight }
 
 func (self *BCPool) loopGenSnippetChains() int {
-	if len(self.blockpool.freeBlocks) == 0 {
-		return 0
-	}
+
 	i := 0
 	//  self.chainpool.snippetChains
 	sortPending := copyValuesFrom(self.blockpool.freeBlocks)
@@ -773,7 +772,7 @@ func (self *BCPool) AddDirectBlock(block common.Block) error {
 	defer self.rMu.Unlock()
 
 	forkVersion := self.version.Val()
-	stat, _ := self.verifier.VerifyReferred(block)
+	stat := self.verifier.VerifyReferred(block)
 	result := stat.VerifyResult()
 	switch result {
 	case verifier.PENDING:
@@ -1005,6 +1004,11 @@ func (self *BCPool) loop() {
 		//self.CheckCurrentInsert()
 		time.Sleep(time.Second)
 	}
+}
+
+func (self *BCPool) ExistInCurrent(request face.FetchRequest) bool {
+	_, ok := self.chainpool.current.heightBlocks[request.Height]
+	return ok
 }
 
 func splitToMap(chains []*snippetChain) map[string]*snippetChain {

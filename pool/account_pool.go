@@ -8,17 +8,19 @@ import (
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/verifier"
 	"github.com/viteshan/naive-vite/version"
 )
 
 type accountPool struct {
 	BCPool
-	mu         sync.Locker
+	mu         sync.Locker // read lock, snapshot insert and account insert
 	rw         *accountCh
 	verifyTask verifier.Task
 
-	loopTime time.Time
+	loopTime    time.Time
+	compactLock common.NonBlockLock
 }
 
 func newAccountPool(name string, rw *accountCh, v *version.Version) *accountPool {
@@ -97,34 +99,90 @@ func (self *accountPool) FindRollbackPointForAccountHashH(height int, hash strin
 }
 
 func (self *accountPool) loop() int {
+	//if !self.compactLock.TryLock() {
+	//	return 0
+	//} else {
+	//	defer self.compactLock.UnLock()
+	//}
+	//
+	//now := time.Now()
+	//if now.After(self.loopTime.Add(time.Millisecond * 200)) {
+	//	self.loopTime = now
+	//	sum := 0
+	//	sum = sum + self.loopGenSnippetChains()
+	//	sum = sum + self.loopAppendChains()
+	//	sum = sum + self.loopFetchForSnippets()
+	//	sum = sum + self.TryInsert()
+	//	return sum
+	//}
+	return 0
+}
+
+/**
+1. compact for data
+	1.1. free blocks
+	1.2. snippet chain
+2. fetch block for snippet chain.
+*/
+func (self *accountPool) Compact() int {
+	// If no new data arrives, do nothing.
+	if len(self.blockpool.freeBlocks) == 0 {
+		return 0
+	}
+	// if an insert operation is in progress, do nothing.
+	if !self.compactLock.TryLock() {
+		return 0
+	} else {
+		defer self.compactLock.UnLock()
+	}
+
+	//	this is a rate limiter
 	now := time.Now()
 	if now.After(self.loopTime.Add(time.Millisecond * 200)) {
+		defer monitor.LogTime("pool", "accountCompact", now)
 		self.loopTime = now
 		sum := 0
 		sum = sum + self.loopGenSnippetChains()
 		sum = sum + self.loopAppendChains()
 		sum = sum + self.loopFetchForSnippets()
-		sum = sum + self.loopAccountTryInsert()
 		return sum
 	}
 	return 0
 }
 
-func (self *accountPool) loopAccountTryInsert() int {
+/**
+try insert block to real chain.
+*/
+func (self *accountPool) TryInsert() verifier.Task {
+	// if current size is empty, do nothing.
 	if self.chainpool.current.size() <= 0 {
-		return 0
+		return nil
 	}
+
+	// if an compact operation is in progress, do nothing.
+	if !self.compactLock.TryLock() {
+		return nil
+	} else {
+		defer self.compactLock.UnLock()
+	}
+
+	// if last verify task has not done
 	if self.verifyTask != nil && !self.verifyTask.Done() {
-		return 0
+		return nil
 	}
+	// lock other chain insert
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	sum := self.accountTryInsert()
-	if sum > 0 && self.verifyTask != nil {
-		reqs := self.verifyTask.Requests()
-		self.syncer.fetchReqs(reqs)
+
+	// try insert block to real chain
+	defer monitor.LogTime("pool", "accountTryInsert", time.Now())
+	task := self.tryInsert()
+	self.verifyTask = task
+	if task != nil {
+		return task
+	} else {
+		return nil
 	}
-	return sum
 }
 
 /**
@@ -138,12 +196,12 @@ func (self *accountPool) loopAccountTryInsert() int {
 
 fail: If no fork version increase, don't do anything.
 pending:
-	pending(2.1): If snapshot height is not reached, don't do anything.
-	pending(2.2): If other account chain height is not reached, don't do anything.
+	pending(2.1): If snapshot height is not reached, fetch snapshot block, and wait..
+	pending(2.2): If other account chain height is not reached, fetch other account block, and wait.
 success:
 	really insert to chain.
 */
-func (self *accountPool) accountTryInsert() int {
+func (self *accountPool) tryInsert() verifier.Task {
 	self.rMu.Lock()
 	defer self.rMu.Unlock()
 	cp := self.chainpool
@@ -151,48 +209,44 @@ func (self *accountPool) accountTryInsert() int {
 	minH := current.tailHeight + 1
 	headH := current.headHeight
 	n := 0
-L:
 	for i := minH; i <= headH; i++ {
 		wrapper := current.getBlock(i, false)
 		block := wrapper.block
 		wrapper.reset()
 		n++
-		stat, task := cp.verifier.VerifyReferred(block)
+		stat := cp.verifier.VerifyReferred(block)
 		if !wrapper.checkForkVersion() {
 			wrapper.reset()
-			break L
+			return verifier.NewSuccessTask()
 		}
 		result := stat.VerifyResult()
 		switch result {
 		case verifier.PENDING:
-			self.verifyTask = task
-			break L
+			return stat.Task()
 		case verifier.FAIL:
 			log.Error("account block verify fail. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
-			self.verifyTask = task
-			break L
+			return verifier.NewFailTask()
 		case verifier.SUCCESS:
-			self.verifyTask = nil
 			if block.Height() == current.tailHeight+1 {
 				err := cp.writeToChain(current, wrapper)
 				if err != nil {
 					log.Error("account block write fail. block info:account[%s],hash[%s],height[%d], err:%v",
 						result, block.Signer(), block.Hash(), block.Height(), err)
-					break L
+					return verifier.NewFailTask()
 				}
 			} else {
-				break L
+				return verifier.NewSuccessTask()
 			}
 		default:
 			// shutdown process
 			log.Fatal("Unexpected things happened. verify result is %d. block info:account[%s],hash[%s],height[%d]",
 				result, block.Signer(), block.Hash(), block.Height())
-			break L
+			return verifier.NewFailTask()
 		}
 	}
 
-	return n
+	return verifier.NewSuccessTask()
 }
 
 func (self *accountPool) insertAccountFailCallback(b common.Block, s verifier.BlockVerifyStat) {

@@ -20,7 +20,7 @@ func NewSnapshotVerifier(r face.ChainReader, v *version.Version) *SnapshotVerifi
 	return verifier
 }
 
-func (self *SnapshotVerifier) VerifyReferred(b common.Block) (BlockVerifyStat, Task) {
+func (self *SnapshotVerifier) VerifyReferred(b common.Block) BlockVerifyStat {
 	block := b.(*common.SnapshotBlock)
 	stat := self.newVerifyStat(VerifyReferred, block)
 	accounts := block.Accounts
@@ -45,15 +45,16 @@ func (self *SnapshotVerifier) VerifyReferred(b common.Block) (BlockVerifyStat, T
 					v.Addr, v.Height, v.Hash)
 				stat.results[v.Addr] = FAIL
 				stat.result = FAIL
-				return stat, nil
+				return stat
 			}
 		}
 	}
 	if i == len(accounts) {
 		stat.result = SUCCESS
-		return stat, nil
+		return stat
 	}
-	return stat, task
+	stat.task = task
+	return stat
 }
 
 type SnapshotBlockVerifyStat struct {
@@ -61,6 +62,15 @@ type SnapshotBlockVerifyStat struct {
 	accounts []*common.AccountHashH
 	results  map[string]VerifyResult
 	errMsg   string
+	task     Task
+}
+
+func (self *SnapshotBlockVerifyStat) Task() Task {
+	if self.task == nil {
+		return nil
+	} else {
+		return self.task
+	}
 }
 
 func (self *SnapshotBlockVerifyStat) ErrMsg() string {

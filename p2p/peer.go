@@ -7,13 +7,15 @@ import (
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 	"github.com/viteshan/naive-vite/common/log"
 )
 
 type closeOnce struct {
-	closed  chan struct{}
-	once    sync.Once
-	writeCh chan []byte
+	closed     chan struct{}
+	once       sync.Once
+	writeCh    chan []byte
+	writeChCap int
 }
 
 type peer struct {
@@ -43,6 +45,12 @@ func (self *peer) Write(msg *Msg) error {
 	if err != nil {
 		log.Error("serialize msg fail. err:%v, msg:%v", err, msg)
 		return err
+	}
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	if len(self.writeCh) >= self.writeChCap {
+		log.Warn("write channel is full and message will be discarded.")
+		return errors.New("write channel is full.")
 	}
 	self.writeCh <- byt
 	return nil
@@ -99,7 +107,8 @@ func newPeer(fromId string, toId string, peerSrvAddr string, conn *websocket.Con
 	remoteAddr := conn.RemoteAddr()
 	peer := &peer{peerId: fromId, selfId: toId, peerSrvAddr: peerSrvAddr, conn: conn, remoteAddr: remoteAddr, state: s}
 	peer.closed = make(chan struct{})
-	peer.writeCh = make(chan []byte, 1000)
+	peer.writeChCap = 1000
+	peer.writeCh = make(chan []byte, peer.writeChCap)
 	conn.SetCloseHandler(func(code int, text string) error {
 		log.Info("peer received closed msg. %s, %v", peer.info(), remoteAddr)
 		return c(code, text)

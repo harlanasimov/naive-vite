@@ -32,17 +32,53 @@ const (
 
 type Callback func(block common.Block, stat BlockVerifyStat)
 type Verifier interface {
-	VerifyReferred(block common.Block) (BlockVerifyStat, Task)
+	VerifyReferred(block common.Block) BlockVerifyStat
 }
 
 type BlockVerifyStat interface {
 	VerifyResult() VerifyResult
 	ErrMsg() string
+	Task() Task
 }
 
 type Task interface {
 	Done() bool
 	Requests() []face.FetchRequest
+}
+
+func NewFailTask() Task {
+	return &failTask{t: time.Now()}
+}
+func NewSuccessTask() Task {
+	return successT
+}
+
+var successT = &successTask{}
+
+type successTask struct {
+}
+
+func (self *successTask) Done() bool {
+	return true
+}
+
+func (*successTask) Requests() []face.FetchRequest {
+	return nil
+}
+
+type failTask struct {
+	t time.Time
+}
+
+func (self *failTask) Done() bool {
+	if time.Now().After(self.t.Add(time.Second * 3)) {
+		return true
+	}
+	return false
+}
+
+func (*failTask) Requests() []face.FetchRequest {
+	return nil
 }
 
 type verifyTask struct {

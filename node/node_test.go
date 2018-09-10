@@ -1,9 +1,9 @@
 package node
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
-
 	"time"
 
 	"github.com/google/gops/agent"
@@ -11,6 +11,9 @@ import (
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/p2p"
+)
+import (
+	_ "net/http/pprof"
 )
 
 func TestNode(t *testing.T) {
@@ -147,7 +150,10 @@ func TestSend(t *testing.T) {
 }
 
 func TestBenchmark(t *testing.T) {
-	log.InitPath()
+	//log.InitPath()
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 	if err := agent.Listen(agent.Options{}); err != nil {
 		log.Fatal("%v", err)
 	}

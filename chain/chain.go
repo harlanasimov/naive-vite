@@ -47,7 +47,19 @@ func (self *blockchain) selfAc(addr string) *accountChain {
 
 // query received block by send block
 func (self *blockchain) GetAccountBySourceHash(address string, source string) *common.AccountStateBlock {
-	return self.selfAc(address).getBySourceBlock(source)
+	b := self.store.GetAccountBySourceHash(source)
+	b2 := self.selfAc(address).getBySourceBlock(source)
+	if b == nil && b2 == nil {
+		return nil
+	}
+	if b == nil || b2 == nil {
+		log.Error("---diff---\nb:%v \nb2:%v", b, b2)
+		return b2
+	}
+	if b.Hash() != b2.Hash() {
+		log.Error("---diff---\nb:%v \nb2:%v", b, b2)
+	}
+	return b2
 }
 
 func (self *blockchain) NextAccountSnapshot() (common.HashHeight, []*common.AccountHashH, error) {

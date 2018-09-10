@@ -1,8 +1,7 @@
 package main
 
 import (
-	"os"
-	"runtime/pprof"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -13,7 +12,15 @@ import (
 	"github.com/viteshan/naive-vite/node"
 )
 
+import (
+	_ "net/http/pprof"
+)
+
 func main() {
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+	//log.InitPath()
 	if err := agent.Listen(agent.Options{}); err != nil {
 		log.Fatal("%v", err)
 	}
@@ -24,32 +31,30 @@ func main() {
 
 	balance := n.Leger().GetAccountBalance("jie")
 	if balance != 200 {
-		//t.Error("balance is wrong.", balance, 200)
 		return
 	}
 
 	balance = n.Leger().GetAccountBalance("viteshan")
 	if balance != 200 {
-		//t.Error("balance is wrong.", balance, 200)
 		return
 	}
-	for i := 0; i < 4; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("jie", addr, -4)
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-	}
-	for i := 0; i < 4; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("viteshan", addr, -4)
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-	}
 	N := 4
+	for i := 0; i < N; i++ {
+		addr := "jie" + strconv.Itoa(i)
+		err := n.Leger().RequestAccountBlock("jie", addr, -30)
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+	}
+	for i := 0; i < N; i++ {
+		addr := "jie" + strconv.Itoa(i)
+		err := n.Leger().RequestAccountBlock("viteshan", addr, -30)
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+	}
 
 	for i := 0; i < N; i++ {
 		from := "jie" + strconv.Itoa(i)
@@ -96,14 +101,13 @@ func main() {
 
 		}("jie" + strconv.Itoa(i))
 	}
-	time.Sleep(10 * time.Second)
-	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 
 	i := make(chan struct{})
 	<-i
 	//time.Sleep(30 * time.Second)
 	//boot.Stop()
 }
+
 func startNode(bootAddr string, port int, nodeId string) node.Node {
 	cfg := config.Node{
 		P2pCfg:       config.P2P{NodeId: nodeId, Port: port, LinkBootAddr: bootAddr, NetId: 0},

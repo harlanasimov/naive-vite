@@ -139,7 +139,7 @@ L:
 		if !wrapper.checkForkVersion() {
 			wrapper.reset()
 		}
-		stat, _ := pool.verifier.VerifyReferred(block)
+		stat := pool.verifier.VerifyReferred(block)
 		if !wrapper.checkForkVersion() {
 			wrapper.reset()
 			continue

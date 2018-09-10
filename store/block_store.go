@@ -28,6 +28,10 @@ type BlockStore interface {
 
 	GetAccountByHash(hash string) *common.AccountStateBlock
 	GetAccountByHeight(address string, height int) *common.AccountStateBlock
+
+	GetAccountBySourceHash(hash string) *common.AccountStateBlock
+	PutSourceHash(hash string, block *common.AccountStateBlock)
+	DeleteSourceHash(hash string)
 }
 
 func NewMemoryStore(snapshotGenesis *common.SnapshotBlock) BlockStore {
@@ -51,6 +55,8 @@ type blockMemoryStore struct {
 	snapshotHash   sync.Map
 	accountHeight  sync.Map
 	accountHash    sync.Map
+	// key: source hash val: received
+	sourceHash sync.Map
 
 	head sync.Map
 
@@ -109,8 +115,6 @@ func (self *blockMemoryStore) PutSnapshot(block *common.SnapshotBlock) {
 }
 
 func (self *blockMemoryStore) PutAccount(address string, block *common.AccountStateBlock) {
-	self.aMu.Lock()
-	defer self.aMu.Unlock()
 	self.accountHash.Store(block.Hash(), block)
 	self.accountHeight.Store(self.genKey(address, block.Height()), block)
 }
@@ -137,6 +141,21 @@ func (self *blockMemoryStore) GetAccountByHash(hash string) *common.AccountState
 		return nil
 	}
 	return value.(*common.AccountStateBlock)
+}
+
+func (self *blockMemoryStore) GetAccountBySourceHash(hash string) *common.AccountStateBlock {
+	value, ok := self.sourceHash.Load(hash)
+	if !ok {
+		return nil
+	}
+	return value.(*common.AccountStateBlock)
+}
+
+func (self *blockMemoryStore) PutSourceHash(hash string, block *common.AccountStateBlock) {
+	self.sourceHash.Store(hash, block)
+}
+func (self *blockMemoryStore) DeleteSourceHash(hash string) {
+	self.sourceHash.Delete(hash)
 }
 
 func (self *blockMemoryStore) GetAccountByHeight(address string, height int) *common.AccountStateBlock {

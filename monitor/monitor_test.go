@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -18,7 +19,7 @@ func TestLogTime(t *testing.T) {
 		for {
 			select {
 			case <-t.C:
-				println(Stat())
+				println(StatJson())
 			}
 		}
 	}()
@@ -33,4 +34,26 @@ func TestLogTime(t *testing.T) {
 
 	<-make(chan int)
 
+}
+
+func TestJson(t *testing.T) {
+	add := newMsg().add(1).add(2)
+	bytes, _ := json.Marshal(add)
+	t.Log(string(bytes))
+	if string(bytes) != add.String() {
+		t.Error("json format fail.")
+	}
+}
+
+func TestSnapshot(t *testing.T) {
+	a := newMsg().add(1).add(2)
+	snapshot := a.snapshot()
+
+	a.add(1)
+
+	println((&snapshot).String())
+	println(a.String())
+	if (&snapshot).String() == a.String() {
+		t.Error("snapshot fail.")
+	}
 }
