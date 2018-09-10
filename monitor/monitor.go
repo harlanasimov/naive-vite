@@ -1,16 +1,13 @@
 package monitor
 
 import (
-	"time"
-
-	"os"
-	"strconv"
-
-	"sync"
-
-	"sync/atomic"
-
 	"encoding/json"
+	"os"
+	"sort"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/vitelabs/go-vite/log15"
 )
@@ -37,8 +34,10 @@ type monitor struct {
 }
 
 type Msg struct {
-	Cnt int64
-	Sum int64
+	Type string
+	Name string
+	Cnt  int64
+	Sum  int64
 }
 
 func (self *Msg) add(i int64) *Msg {
@@ -65,8 +64,8 @@ func (self *Msg) snapshot() Msg {
 	return *self
 }
 
-func newMsg() *Msg {
-	return &Msg{}
+func newMsg(t string, name string) *Msg {
+	return &Msg{Type: t, Name: name}
 }
 
 func key(t string, name string) string {
@@ -90,7 +89,7 @@ func log(t string, name string, i int64) {
 	if ok {
 		value.(*Msg).add(i)
 	} else {
-		m.ms.Store(k, newMsg().add(i))
+		m.ms.Store(k, newMsg(t, name).add(i))
 	}
 }
 
@@ -99,7 +98,7 @@ type stat struct {
 	Avg float64
 }
 
-func Stat() map[string]*Msg {
+func Stat() []*Msg {
 	all := m.r.all()
 	msgs := make(map[string]*Msg)
 	for _, v := range all {
@@ -113,7 +112,26 @@ func Stat() map[string]*Msg {
 			}
 		}
 	}
-	return msgs
+
+	var r []*Msg
+	for _, v := range msgs {
+		r = append(r, v)
+	}
+
+	sort.Sort(byStr(r))
+	return r
+}
+
+type byStr []*Msg
+
+func (a byStr) Len() int      { return len(a) }
+func (a byStr) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byStr) Less(i, j int) bool {
+	if a[i].Type == a[j].Type {
+		return a[i].Name < a[j].Name
+	} else {
+		return a[i].Type < a[j].Type
+	}
 }
 
 func StatJson() string {
@@ -126,7 +144,8 @@ func StatJson() string {
 			if ok {
 				tmpM.merge(v2)
 			} else {
-				msgs[k2] = v2
+				s := v2.snapshot()
+				msgs[k2] = &s
 			}
 		}
 	}

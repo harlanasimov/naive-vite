@@ -569,9 +569,9 @@ func main() {
 			Help: "print monitor stat info.",
 			Func: func(c *ishell.Context) {
 				stat := monitor.Stat()
-				for k, v := range stat {
+				for _, v := range stat {
 					if v.Cnt > 0 {
-						c.Printf("%s\t, %d, %f", k, v.Cnt, float64(float64(v.Sum)/float64(v.Cnt)))
+						c.Printf("%s-%s\t %d, %f", v.Type, v.Name, v.Cnt, float64(float64(v.Sum)/float64(v.Cnt)))
 						c.Println()
 					}
 				}

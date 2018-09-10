@@ -37,7 +37,7 @@ func TestLogTime(t *testing.T) {
 }
 
 func TestJson(t *testing.T) {
-	add := newMsg().add(1).add(2)
+	add := newMsg("a", "b").add(1).add(2)
 	bytes, _ := json.Marshal(add)
 	t.Log(string(bytes))
 	if string(bytes) != add.String() {
@@ -46,7 +46,7 @@ func TestJson(t *testing.T) {
 }
 
 func TestSnapshot(t *testing.T) {
-	a := newMsg().add(1).add(2)
+	a := newMsg("a", "b").add(1).add(2)
 	snapshot := a.snapshot()
 
 	a.add(1)
