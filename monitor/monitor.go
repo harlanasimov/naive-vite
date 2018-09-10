@@ -33,39 +33,34 @@ type monitor struct {
 	r  *ring
 }
 
-type Msg struct {
+type msg struct {
 	Type string
 	Name string
 	Cnt  int64
 	Sum  int64
 }
 
-func (self *Msg) add(i int64) *Msg {
+func (self *msg) add(i int64) *msg {
 	atomic.AddInt64(&self.Cnt, 1)
 	atomic.AddInt64(&self.Sum, i)
 	return self
 }
-func (self *Msg) merge(ms *Msg) *Msg {
-	atomic.AddInt64(&self.Cnt, ms.Cnt)
-	atomic.AddInt64(&self.Sum, ms.Sum)
-	return self
-}
 
-func (self *Msg) String() string {
+func (self *msg) String() string {
 	return "{\"Cnt\":" + strconv.FormatInt(self.Cnt, 10) + ",\"Sum\":" + strconv.FormatInt(self.Sum, 10) + "}"
 }
 
-func (self *Msg) reset() *Msg {
+func (self *msg) reset() *msg {
 	atomic.StoreInt64(&self.Sum, 0)
 	atomic.StoreInt64(&self.Cnt, 0)
 	return self
 }
-func (self *Msg) snapshot() Msg {
+func (self *msg) snapshot() msg {
 	return *self
 }
 
-func newMsg(t string, name string) *Msg {
-	return &Msg{Type: t, Name: name}
+func newMsg(t string, name string) *msg {
+	return &msg{Type: t, Name: name}
 }
 
 func key(t string, name string) string {
@@ -87,33 +82,44 @@ func log(t string, name string, i int64) {
 	k := key(t, name)
 	value, ok := m.ms.Load(k)
 	if ok {
-		value.(*Msg).add(i)
+		value.(*msg).add(i)
 	} else {
 		m.ms.Store(k, newMsg(t, name).add(i))
 	}
 }
 
-type stat struct {
-	Cnt int64
-	Avg float64
+type Stat struct {
+	Name    string
+	Type    string
+	Cnt     int64
+	Sum     int64
+	Avg     float64 // Sum / Cnt
+	CntMean float64 // Cnt / Cap
+	Cap     int32
 }
 
-func Stat() []*Msg {
-	all := m.r.all()
-	msgs := make(map[string]*Msg)
-	for _, v := range all {
-		msgM := v.(map[string]*Msg)
-		for k2, v2 := range msgM {
-			tmpM, ok := msgs[k2]
-			if ok {
-				tmpM.merge(v2)
-			} else {
-				msgs[k2] = v2
-			}
-		}
+func (self *Stat) merge(ms *msg) *Stat {
+	self.Cnt += ms.Cnt
+	self.Sum += ms.Sum
+	self.Cap++
+	return self
+}
+func (self *Stat) avg() *Stat {
+	if self.Cnt > 0 {
+		self.Avg = float64(self.Sum) / float64(self.Cnt)
+
 	}
 
-	var r []*Msg
+	if self.Cap > 0 {
+		self.CntMean = float64(self.Cnt) / float64(self.Cap)
+	}
+	return self
+}
+
+func Stats() []*Stat {
+	msgs := stats()
+
+	var r []*Stat
 	for _, v := range msgs {
 		r = append(r, v)
 	}
@@ -122,7 +128,38 @@ func Stat() []*Msg {
 	return r
 }
 
-type byStr []*Msg
+func StatsJson() string {
+	r := stats()
+	b, _ := json.Marshal(r)
+	return string(b)
+}
+
+func stats() map[string]*Stat {
+	all := m.r.all()
+	msgs := make(map[string]*Stat)
+	for _, v := range all {
+		msgM := v.(map[string]*msg)
+		for k2, v2 := range msgM {
+			if v2.Cnt <= 0 {
+				continue
+			}
+			tmpM, ok := msgs[k2]
+			if ok {
+				tmpM.merge(v2)
+			} else {
+				s := &Stat{Name: v2.Name, Type: v2.Type}
+				s.merge(v2)
+				msgs[k2] = s
+			}
+		}
+	}
+	for _, v := range msgs {
+		v.avg()
+	}
+	return msgs
+}
+
+type byStr []*Stat
 
 func (a byStr) Len() int      { return len(a) }
 func (a byStr) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -134,41 +171,16 @@ func (a byStr) Less(i, j int) bool {
 	}
 }
 
-func StatJson() string {
-	all := m.r.all()
-	msgs := make(map[string]*Msg)
-	for _, v := range all {
-		msgM := v.(map[string]*Msg)
-		for k2, v2 := range msgM {
-			tmpM, ok := msgs[k2]
-			if ok {
-				tmpM.merge(v2)
-			} else {
-				s := v2.snapshot()
-				msgs[k2] = &s
-			}
-		}
-	}
-	r := make(map[string]*stat)
-	for k, v := range msgs {
-		if v.Cnt != 0 {
-			r[k] = &stat{Cnt: v.Cnt, Avg: float64(v.Sum / v.Cnt)}
-		}
-	}
-	b, _ := json.Marshal(r)
-	return string(b)
-}
-
 func loop() {
 	t := time.NewTicker(time.Second * 1)
 	for {
 
 		select {
 		case <-t.C:
-			snapshot := make(map[string]*Msg)
+			snapshot := make(map[string]*msg)
 
 			m.ms.Range(func(k, v interface{}) bool {
-				tmpM := v.(*Msg)
+				tmpM := v.(*msg)
 				c := tmpM.Cnt
 				s := tmpM.Sum
 				key := k.(string)

@@ -568,10 +568,12 @@ func main() {
 			Name: "stat",
 			Help: "print monitor stat info.",
 			Func: func(c *ishell.Context) {
-				stat := monitor.Stat()
-				for _, v := range stat {
+				stats := monitor.Stats()
+				for _, v := range stats {
 					if v.Cnt > 0 {
-						c.Printf("%s-%s\t %d, %f", v.Type, v.Name, v.Cnt, float64(float64(v.Sum)/float64(v.Cnt)))
+						c.Printf("%s-%s", v.Type, v.Name)
+						c.Println()
+						c.Printf("\t\t\t%f\t%f\t%d\t%d", v.CntMean, v.Avg, v.Cnt, v.Cap)
 						c.Println()
 					}
 				}

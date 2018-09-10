@@ -68,9 +68,9 @@ func (self *AccountVerifier) verifySelf(block *common.AccountStateBlock, stat *A
 }
 
 func (self *AccountVerifier) verifyFrom(block *common.AccountStateBlock, stat *AccountBlockVerifyStat) bool {
-	defer monitor.LogTime("verify", "accountFrom", time.Now())
 	// from amount
 	if block.BlockType == common.RECEIVED {
+		defer monitor.LogTime("verify", "accountFrom", time.Now())
 
 		fromAmount := self.checkFromAmount(block, stat)
 		stat.referredFromResult = fromAmount

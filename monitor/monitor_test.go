@@ -15,22 +15,22 @@ func TestLogTime(t *testing.T) {
 	}()
 
 	go func() {
-		t := time.NewTicker(time.Second * 2)
+		t := time.NewTicker(time.Millisecond * 500)
 		for {
 			select {
 			case <-t.C:
-				println(StatJson())
+				println(StatsJson())
 			}
 		}
 	}()
 
-	time.Sleep(10 * time.Second)
-	go func() {
-		for {
-			LogTime("a", "b", time.Now().Add(-time.Second*60))
-			time.Sleep(200 * time.Millisecond)
-		}
-	}()
+	//time.Sleep(10 * time.Second)
+	//go func() {
+	//	for {
+	//		LogTime("a", "b", time.Now().Add(-time.Second*60))
+	//		time.Sleep(200 * time.Millisecond)
+	//	}
+	//}()
 
 	<-make(chan int)
 
