@@ -34,10 +34,11 @@ type monitor struct {
 }
 
 type msg struct {
-	Type string
-	Name string
-	Cnt  int64
-	Sum  int64
+	Group string
+	Type  int
+	Name  string
+	Cnt   int64
+	Sum   int64
 }
 
 func (self *msg) add(i int64) *msg {
@@ -59,32 +60,32 @@ func (self *msg) snapshot() msg {
 	return *self
 }
 
-func newMsg(t string, name string) *msg {
-	return &msg{Type: t, Name: name}
+func newMsg(g string, name string, t int) *msg {
+	return &msg{Group: g, Name: name, Type: t}
 }
 
 func key(t string, name string) string {
 	return t + "-" + name
 }
 func LogEvent(t string, name string) {
-	log(t, name, 1)
+	log(t, name, 1, 1)
 }
 
 func LogTime(t string, name string, tm time.Time) {
-	log(t, name, time.Now().Sub(tm).Nanoseconds())
+	log(t, name, 2, time.Now().Sub(tm).Nanoseconds())
 }
 
 func LogDuration(t string, name string, duration int64) {
-	log(t, name, duration)
+	log(t, name, 2, duration)
 }
 
-func log(t string, name string, i int64) {
-	k := key(t, name)
+func log(g string, name string, t int, i int64) {
+	k := key(g, name)
 	value, ok := m.ms.Load(k)
 	if ok {
 		value.(*msg).add(i)
 	} else {
-		m.ms.Store(k, newMsg(t, name).add(i))
+		m.ms.Store(k, newMsg(g, name, t).add(i))
 	}
 }
 
@@ -147,7 +148,7 @@ func stats() map[string]*Stat {
 			if ok {
 				tmpM.merge(v2)
 			} else {
-				s := &Stat{Name: v2.Name, Type: v2.Type}
+				s := &Stat{Name: v2.Name, Type: v2.Group}
 				s.merge(v2)
 				msgs[k2] = s
 			}
@@ -183,10 +184,15 @@ func loop() {
 				tmpM := v.(*msg)
 				c := tmpM.Cnt
 				s := tmpM.Sum
+				t := tmpM.Type
 				key := k.(string)
-				logger.Info("", "group", "monitor", "interval", 1, "name", key,
+				logger.Info("",
+					"group", "monitor",
+					"name", key,
+					"interval", 1,
 					"metric-cnt", c,
 					"metric-sum", s,
+					"metric-type", t,
 				)
 				sm := tmpM.snapshot()
 				snapshot[key] = &sm
