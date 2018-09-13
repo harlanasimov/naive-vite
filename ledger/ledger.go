@@ -8,6 +8,7 @@ import (
 	"github.com/viteshan/naive-vite/chain"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/pool"
 	"github.com/viteshan/naive-vite/syncer"
 	"github.com/viteshan/naive-vite/tools"
@@ -83,6 +84,7 @@ func (self *ledger) MiningSnapshotBlock(address string, timestamp int64) error {
 }
 
 func (self *ledger) RequestAccountBlock(from string, to string, amount int) error {
+	defer monitor.LogTime("ledger", "requestAccount", time.Now())
 	headAccount, _ := self.bc.HeadAccount(from)
 	headSnaphost, _ := self.bc.HeadSnapshot()
 
@@ -96,6 +98,7 @@ func (self *ledger) RequestAccountBlock(from string, to string, amount int) erro
 	return err
 }
 func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string) error {
+	defer monitor.LogTime("ledger", "responseAccount", time.Now())
 	b := self.bc.GetAccountByHash(from, reqHash)
 	if b == nil {
 		return errors.New("not exist for account[" + from + "]block[" + reqHash + "]")

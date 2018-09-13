@@ -5,6 +5,7 @@ import (
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
+	"github.com/viteshan/naive-vite/tools"
 	"github.com/viteshan/naive-vite/version"
 )
 
@@ -176,4 +177,14 @@ func (self *verifyTask) pendingSnapshot(hash string, height uint64) {
 func (self *verifyTask) pendingAccount(addr string, height uint64, hash string, prevCnt uint64) {
 	request := face.FetchRequest{Chain: addr, Hash: hash, Height: height, PrevCnt: prevCnt}
 	self.tasks = append(self.tasks, &accountPendingTask{self.reader, false, request})
+}
+
+func VerifyAccount(block *common.AccountStateBlock) bool {
+	hash := tools.CalculateAccountHash(block)
+	return block.Hash() == hash
+}
+
+func VerifySnapshotHash(block *common.SnapshotBlock) bool {
+	hash := tools.CalculateSnapshotHash(block)
+	return block.Hash() == hash
 }

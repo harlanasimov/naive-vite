@@ -34,6 +34,7 @@ func SerializeAccountBlock(block *common.AccountStateBlock) ([]byte, error) {
 		Height:         block.Height(),
 		PreHash:        block.PreHash(),
 		Hash:           block.Hash(),
+		Signer:         block.Signer(),
 		Timestamp:      block.Timestamp().UnixNano(),
 		Amount:         int64(block.Amount),
 		ModifiedAmount: int64(block.ModifiedAmount),

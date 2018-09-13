@@ -6,7 +6,7 @@ import (
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
-	"github.com/viteshan/naive-vite/tools"
+	"github.com/viteshan/naive-vite/verifier"
 )
 
 type receiver struct {
@@ -153,7 +153,7 @@ func (self *snapshotBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer 
 		log.Error("snapshotBlocksHandler.Handle unmarshal fail.")
 	}
 	for _, v := range hashesMsg.Blocks {
-		r := verifySnapshotHash(v)
+		r := verifier.VerifySnapshotHash(v)
 		if !r {
 			log.Warn("error hash for snapshot block. %v", v)
 			continue
@@ -162,10 +162,7 @@ func (self *snapshotBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer 
 		self.sWriter.AddSnapshotBlock(v)
 	}
 }
-func verifySnapshotHash(block *common.SnapshotBlock) bool {
-	hash := tools.CalculateSnapshotHash(block)
-	return block.Hash() == hash
-}
+
 func (self *snapshotBlocksHandler) Id() string {
 	return "default-snapshotBlocksHandler"
 }
@@ -187,7 +184,7 @@ func (self *accountBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p
 		log.Error("accountBlocksHandler.Handle unmarshal fail.")
 	}
 	for _, v := range hashesMsg.Blocks {
-		r := verifyAccount(v)
+		r := verifier.VerifyAccount(v)
 		if !r {
 			log.Warn("error hash for account block. %v", v)
 			continue
@@ -195,10 +192,6 @@ func (self *accountBlocksHandler) Handle(t common.NetMsgType, msg []byte, peer p
 		self.fetcher.done(v.Hash(), v.Height())
 		self.aWriter.AddAccountBlock(v.Signer(), v)
 	}
-}
-func verifyAccount(block *common.AccountStateBlock) bool {
-	hash := tools.CalculateAccountHash(block)
-	return block.Hash() == hash
 }
 
 func (self *accountBlocksHandler) Id() string {

@@ -3,9 +3,12 @@ package syncer
 import (
 	"encoding/json"
 
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/p2p"
 )
 
@@ -41,6 +44,7 @@ func (self *sender) broadcastState(s stateMsg) error {
 }
 
 func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.AccountStateBlock) error {
+	defer monitor.LogTime("net", "broadcastAccount", time.Now())
 	bytM, err := json.Marshal(&accountBlocksMsg{Address: address, Blocks: blocks})
 	msg := p2p.NewMsg(common.AccountBlocks, bytM)
 
@@ -68,6 +72,7 @@ func (self *sender) BroadcastAccountBlocks(address string, blocks []*common.Acco
 }
 
 func (self *sender) BroadcastSnapshotBlocks(blocks []*common.SnapshotBlock) error {
+	defer monitor.LogTime("net", "broadcastSnapshot", time.Now())
 	bytM, err := json.Marshal(&snapshotBlocksMsg{Blocks: blocks})
 	msg := p2p.NewMsg(common.SnapshotBlocks, bytM)
 

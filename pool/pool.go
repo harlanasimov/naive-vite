@@ -123,6 +123,7 @@ func (self *pool) AddAccountBlock(address string, block *common.AccountStateBloc
 }
 
 func (self *pool) AddDirectAccountBlock(address string, block *common.AccountStateBlock) error {
+	defer monitor.LogTime("pool", "addDirectAccount", time.Now())
 	self.rwMutex.RLock()
 	defer self.rwMutex.RUnlock()
 	ac := self.selfPendingAc(address)
