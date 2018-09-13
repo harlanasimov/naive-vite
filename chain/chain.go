@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/store"
@@ -23,13 +24,14 @@ type blockchain struct {
 	store    store.BlockStore
 	listener face.ChainListener
 
+	cfg *config.Chain
+
 	mu sync.Mutex // account chain init
 }
 
-func NewChain() BlockChain {
-	self := &blockchain{}
-	//self.store = store.NewMemoryStore(GetGenesisSnapshot())
-	self.store = store.NewBlockLeveldbStore("/Users/jie/naive_vite/data/chain.db")
+func NewChain(cfg *config.Chain) BlockChain {
+	self := &blockchain{cfg: cfg}
+	self.store = store.NewStore(cfg)
 	self.sc = newSnapshotChain(self.store)
 	self.listener = &defaultChainListener{}
 	return self
@@ -49,18 +51,7 @@ func (self *blockchain) selfAc(addr string) *accountChain {
 // query received block by send block
 func (self *blockchain) GetAccountBySourceHash(address string, source string) *common.AccountStateBlock {
 	b := self.store.GetAccountBySourceHash(source)
-	b2 := self.selfAc(address).getBySourceBlock(source)
-	if b == nil && b2 == nil {
-		return nil
-	}
-	if b == nil || b2 == nil {
-		log.Error("---diff---\nb:%v \nb2:%v", b, b2)
-		return b2
-	}
-	if b.Hash() != b2.Hash() {
-		log.Error("---diff---\nb:%v \nb2:%v", b, b2)
-	}
-	return b2
+	return b
 }
 
 func (self *blockchain) NextAccountSnapshot() (common.HashHeight, []*common.AccountHashH, error) {

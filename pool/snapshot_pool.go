@@ -161,6 +161,8 @@ L:
 					log.Error("insert snapshot chain fail. block info:hash[%s],height[%d], err:%v",
 						block.Hash(), block.Height(), err)
 					break L
+				} else {
+					self.blockpool.afterInsert(wrapper)
 				}
 			} else {
 				break L

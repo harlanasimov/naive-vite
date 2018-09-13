@@ -107,7 +107,7 @@ type p2p struct {
 	msgHandleFn  MsgHandle
 }
 
-func NewP2P(config config.P2P) P2P {
+func NewP2P(config *config.P2P) P2P {
 	p2p := &p2p{id: config.NodeId, netId: config.NetId, addr: "localhost:" + strconv.Itoa(config.Port), closed: make(chan struct{}), linkBootAddr: config.LinkBootAddr}
 	return p2p
 }

@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/google/gops/agent"
+	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/p2p"
-)
-import (
+
 	_ "net/http/pprof"
+	"path"
 )
 
 func TestNode(t *testing.T) {
@@ -31,12 +32,17 @@ func TestNode(t *testing.T) {
 	//		n.Start()
 	//	}(j)
 	//}
-	cfg := config.Node{
-		P2pCfg:       config.P2P{NodeId: strconv.Itoa(3), Port: 8080 + 3, LinkBootAddr: bootAddr, NetId: 0},
-		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
-		MinerCfg:     config.Miner{Enabled: true, HexCoinbase: "vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8"},
+	cfg := &config.Node{
+		P2pCfg:       &config.P2P{NodeId: strconv.Itoa(3), Port: 8080 + 3, LinkBootAddr: bootAddr, NetId: 0},
+		ConsensusCfg: &config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+		MinerCfg:     &config.Miner{Enabled: true, HexCoinbase: "vite_2ad1b8f936f015fc80a2a5857dffb84b39f7675ab69ae31fc8"},
+		ChainCfg:     &config.Chain{StoreType: common.Memory},
+		BaseCfg:      &config.Base{DataDir: "/Users/jie/naive_vite/data"},
 	}
-	n := NewNode(cfg)
+	n, e := NewNode(cfg)
+	if e != nil {
+		panic(e)
+	}
 	n.Init()
 	n.Start()
 
@@ -67,11 +73,17 @@ func TestBootNode(t *testing.T) {
 func TestNode_Start(t *testing.T) {
 	bootAddr := "localhost:8000"
 	i := 0
-	cfg := config.Node{
-		P2pCfg:       config.P2P{NodeId: strconv.Itoa(i), Port: 8080 + i, LinkBootAddr: bootAddr, NetId: 0},
-		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+	cfg := &config.Node{
+		P2pCfg:       &config.P2P{NodeId: strconv.Itoa(i), Port: 8080 + i, LinkBootAddr: bootAddr, NetId: 0},
+		ConsensusCfg: &config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+		ChainCfg:     &config.Chain{StoreType: common.Memory},
+		MinerCfg:     &config.Miner{Enabled: false},
+		BaseCfg:      &config.Base{DataDir: "/Users/jie/naive_vite/data"},
 	}
-	n := NewNode(cfg)
+	n, e := NewNode(cfg)
+	if e != nil {
+		panic(e)
+	}
 	n.Init()
 	n.Start()
 	time.Sleep(200 * time.Second)
@@ -157,9 +169,8 @@ func TestBenchmark(t *testing.T) {
 	if err := agent.Listen(agent.Options{}); err != nil {
 		log.Fatal("%v", err)
 	}
-	defaultBoot := "localhost:8000"
 	//boot := startBoot(defaultBoot)
-	n := startNode(defaultBoot, 8081, "100")
+	n := startNodeFromDefaul()
 	time.Sleep(time.Second)
 
 	jieBalance := n.Leger().GetAccountBalance("jie")
@@ -190,15 +201,14 @@ func TestBenchmark(t *testing.T) {
 			}
 		}
 	}
-
-	for i := 0; i < N; i++ {
-		from := "jie" + strconv.Itoa(i)
-		to := "jie" + strconv.Itoa(i-1)
-		if i == 0 {
-			to = "jie" + strconv.Itoa(N-1)
-		}
-		go func(from string, to string) {
-			for {
+	go func() {
+		for {
+			for i := 0; i < N; i++ {
+				from := "jie" + strconv.Itoa(i)
+				to := "jie" + strconv.Itoa(i-1)
+				if i == 0 {
+					to = "jie" + strconv.Itoa(N-1)
+				}
 				balance := n.Leger().GetAccountBalance(from)
 				if balance > 1 {
 					log.Info("from:%s, to:%s, %d", from, to, balance)
@@ -206,20 +216,20 @@ func TestBenchmark(t *testing.T) {
 						err := n.Leger().RequestAccountBlock(from, to, -1)
 						if err != nil {
 							log.Error("%v", err)
-							//return
 						}
 					}
 
 				}
-				time.Sleep(time.Millisecond * 400)
+
 			}
+			time.Sleep(time.Millisecond * 200)
+		}
+	}()
 
-		}(from, to)
-	}
-
-	for i := 0; i < N; i++ {
-		go func(addr string) {
-			for {
+	go func() {
+		for {
+			for i := 0; i < N; i++ {
+				addr := "jie" + strconv.Itoa(i)
 				reqs := n.Leger().ListRequest(addr)
 				if len(reqs) > 0 {
 					for _, r := range reqs {
@@ -231,24 +241,60 @@ func TestBenchmark(t *testing.T) {
 						}
 					}
 				}
-				time.Sleep(time.Second)
+
 			}
+		}
+	}()
 
-		}("jie" + strconv.Itoa(i))
-	}
+	<-make(chan struct{})
 
-	i := make(chan struct{})
-	<-i
 	//time.Sleep(30 * time.Second)
 	//boot.Stop()
 }
 
 func startNode(bootAddr string, port int, nodeId string) Node {
-	cfg := config.Node{
-		P2pCfg:       config.P2P{NodeId: nodeId, Port: port, LinkBootAddr: bootAddr, NetId: 0},
-		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+	cfg := &config.Node{
+		P2pCfg:       &config.P2P{NodeId: nodeId, Port: port, LinkBootAddr: bootAddr, NetId: 0},
+		ConsensusCfg: &config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+		ChainCfg:     &config.Chain{StoreType: common.Memory},
+		MinerCfg:     &config.Miner{Enabled: false},
+		BaseCfg:      &config.Base{DataDir: "/Users/jie/naive_vite/data"},
 	}
-	n := NewNode(cfg)
+	n, e := NewNode(cfg)
+	if e != nil {
+		panic(e)
+	}
+	n.Init()
+	n.Start()
+	return n
+}
+
+func startNodeFromDefaul() Node {
+	cfg := &config.Node{}
+	cfg.Parse(path.Join(config.HomeDir, "/naive_vite/etc/default.yaml"))
+	n, e := NewNode(cfg)
+	if e != nil {
+		panic(e)
+	}
+	n.Init()
+	n.Start()
+	return n
+}
+
+func TestNode_Disk(t *testing.T) {
+	disk := startNodeFromDefaultDisk()
+	disk.Leger().Chain().HeadAccount("jie3")
+	<-make(chan struct{})
+
+}
+
+func startNodeFromDefaultDisk() Node {
+	cfg := &config.Node{}
+	cfg.Parse(path.Join(config.HomeDir, "/naive_vite/etc/config_disk_1.yaml"))
+	n, e := NewNode(cfg)
+	if e != nil {
+		panic(e)
+	}
 	n.Init()
 	n.Start()
 	return n

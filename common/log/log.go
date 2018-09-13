@@ -11,9 +11,10 @@ import (
 )
 
 func InitPath() {
+	//  /Users/jie/naive_vite/etc
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	rand.Seed(time.Now().Unix())

@@ -108,7 +108,7 @@ func (self *accountChain) findAccountAboveSnapshotHeight(snapshotHeight uint64) 
 	if self.head == nil {
 		return nil
 	}
-	for i := self.head.Height(); i >= 0; i-- {
+	for i := self.head.Height(); i >= common.FirstHeight; i-- {
 		block := self.store.GetAccountByHeight(self.address, i)
 		if block.SnapshotHeight <= snapshotHeight {
 			return block

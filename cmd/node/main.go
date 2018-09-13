@@ -1,31 +1,42 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
+	"net/http"
+	"path"
 	"strconv"
 
-	"encoding/json"
-
-	"net"
-
-	"net/http"
+	"bytes"
 
 	"github.com/abiosoft/ishell"
 	"github.com/google/gops/agent"
+	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/log"
-	"github.com/viteshan/naive-vite/consensus"
 	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/node"
 	"github.com/viteshan/naive-vite/p2p"
-)
-import (
-	_ "net/http/pprof"
 )
 
 func main() {
 	if err := agent.Listen(agent.Options{}); err != nil {
 		log.Fatal("%v", err)
 	}
+
+	configPath := flag.String("config", path.Join(config.HomeDir, "/naive_vite/etc/default.yaml"), "config path")
+	flag.Parse()
+	log.Info(*configPath)
+	cfg := new(config.Node)
+	e := cfg.Parse(*configPath)
+	if e != nil {
+		panic(e)
+	}
+	e = cfg.Check()
+	if e != nil {
+		panic(e)
+	}
+
 	log.InitPath()
 	// create new shell.
 	// by default, new shell includes 'exit', 'help' and 'clear' commands.
@@ -34,7 +45,34 @@ func main() {
 	// display welcome info.
 	shell.Println("naive-vite Interactive Shell")
 
-	defaultBootAddr := "localhost:8000"
+	{
+		autoCmd := &ishell.Cmd{
+			Name: "config",
+			Help: "show config info",
+		}
+		autoCmd.AddCmd(&ishell.Cmd{
+			Name: "info",
+			Help: "show config info",
+			Func: func(c *ishell.Context) {
+				b, err := json.Marshal(cfg)
+				if err != nil {
+					c.Err(e)
+				}
+
+				var out bytes.Buffer
+				err = json.Indent(&out, b, "", "\t")
+
+				if err != nil {
+					c.Err(e)
+				}
+
+				c.Println(out.String())
+			},
+		})
+		shell.AddCmd(autoCmd)
+
+	}
+
 	// subcommands and custom autocomplete.
 	{
 		var bootNode p2p.Boot
@@ -50,16 +88,12 @@ func main() {
 					c.Println("boot has started.")
 					return
 				}
-				c.ShowPrompt(false)
-				defer c.ShowPrompt(true)
-				c.Print("BootAddr: ")
-				bootAddr := c.ReadLine()
-
-				if bootAddr == "" {
-					bootAddr = defaultBootAddr
+				if cfg.BootCfg == nil || !cfg.BootCfg.Enabled {
+					c.Println("boot config must be set")
+					return
 				}
-				bootNode = startBoot(bootAddr)
-				c.Println("boot start for[" + bootAddr + "] successfully.")
+				bootNode = startBoot(cfg.BootCfg.BootAddr)
+				c.Println("boot start for[" + cfg.BootCfg.BootAddr + "] successfully.")
 			},
 		})
 
@@ -112,29 +146,13 @@ func main() {
 					c.Println("node has started.")
 					return
 				}
-				c.ShowPrompt(false)
-				defer c.ShowPrompt(true)
 
-				c.Print("NodeId: ")
-				id := c.ReadLine()
-
-				c.Print("Port: ")
-				port, _ := strconv.Atoi(c.ReadLine())
-
-				c.Print("BootAddr: ")
-				bootAddr := c.ReadLine()
-
-				addr, e := net.ResolveTCPAddr("tcp4", bootAddr)
-
-				if bootAddr == "" || e != nil {
-					c.Printf("input boot address error, use default bootAddr[%s].\n", defaultBootAddr)
-					bootAddr = defaultBootAddr
-				} else {
-					bootAddr = addr.String()
+				node, e = startNode(cfg)
+				if e != nil {
+					c.Err(e)
+					return
 				}
-
-				node = startNode(bootAddr, port, id)
-				c.Println("node start for[" + bootAddr + "] successfully.")
+				c.Println("node start successfully.")
 			},
 		})
 
@@ -393,7 +411,7 @@ func main() {
 				c.Println("Height\tHash\tPrevHash")
 				blocks := node.Leger().ListAccountBlock(addr)
 				for _, b := range blocks {
-					c.Printf("%d\t%s\t%s\n", b.Height(), b.Hash(), b.PreHash())
+					c.Printf("%s\t%s\t%s\n", strconv.FormatUint(b.Height(), 10), b.Hash(), b.PreHash())
 				}
 			},
 		})
@@ -451,11 +469,11 @@ func main() {
 					c.Println("node should be stopped.")
 					return
 				}
-				height := -1
+				height := common.EmptyHeight
 				addr := node.Wallet().CoinBase()
 				if len(c.Args) == 2 {
 					addr = c.Args[0]
-					height, _ = strconv.Atoi(c.Args[1])
+					height, _ = strconv.ParseUint(c.Args[1], 10, 64)
 				}
 				block := node.Leger().Chain().GetAccountByHeight(addr, height)
 				bytes, _ := json.Marshal(block)
@@ -507,9 +525,9 @@ func main() {
 					c.Println("node should be stopped.")
 					return
 				}
-				height := -1
+				height := common.EmptyHeight
 				if len(c.Args) == 1 {
-					height, _ = strconv.Atoi(c.Args[0])
+					height, _ = strconv.ParseUint(c.Args[0], 10, 64)
 				}
 				block := node.Leger().Chain().GetSnapshotByHeight(height)
 				bytes, _ := json.Marshal(block)
@@ -608,15 +626,14 @@ func main() {
 	// run shell
 	shell.Run()
 }
-func startNode(bootAddr string, port int, nodeId string) node.Node {
-	cfg := config.Node{
-		P2pCfg:       config.P2P{NodeId: nodeId, Port: port, LinkBootAddr: bootAddr, NetId: 0},
-		ConsensusCfg: config.Consensus{Interval: 1, MemCnt: len(consensus.DefaultMembers)},
+func startNode(cfg *config.Node) (node.Node, error) {
+	n, e := node.NewNode(cfg)
+	if e != nil {
+		return nil, e
 	}
-	n := node.NewNode(cfg)
 	n.Init()
 	n.Start()
-	return n
+	return n, nil
 }
 
 func checkArgs(args []string) (bool, string) {

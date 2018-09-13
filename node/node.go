@@ -26,25 +26,25 @@ type Node interface {
 	Wallet() wallet.Wallet
 }
 
-func NewNode(cfg config.Node) Node {
+func NewNode(cfg *config.Node) (Node, error) {
+	e := cfg.Check()
+	if e != nil {
+		return nil, e
+	}
 	self := &node{}
 	self.bus = EventBus.New()
 	self.closed = make(chan struct{})
 	self.cfg = cfg
 	self.p2p = p2p.NewP2P(self.cfg.P2pCfg)
 	self.syncer = syncer.NewSyncer(self.p2p, self.bus)
-	self.bc = chain.NewChain()
+	self.bc = chain.NewChain(self.cfg.ChainCfg)
 	self.ledger = ledger.NewLedger(self.bc)
 	self.consensus = consensus.NewConsensus(chain.GetGenesisSnapshot().Timestamp(), self.cfg.ConsensusCfg)
 
 	if self.cfg.MinerCfg.Enabled {
-		if self.cfg.MinerCfg.CoinBase().String() == "" {
-			log.Error("coinBase must be set.")
-		} else {
-			self.miner = miner.NewMiner(self.ledger, self.syncer, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
-		}
+		self.miner = miner.NewMiner(self.ledger, self.syncer, self.bus, self.cfg.MinerCfg.CoinBase(), self.consensus)
 	}
-	return self
+	return self, nil
 }
 
 type node struct {
@@ -57,7 +57,7 @@ type node struct {
 	wallet    wallet.Wallet
 	bus       EventBus.Bus
 
-	cfg    config.Node
+	cfg    *config.Node
 	closed chan struct{}
 	wg     sync.WaitGroup
 }

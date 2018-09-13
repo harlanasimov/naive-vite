@@ -122,7 +122,7 @@ func (self *diskChain) id() string {
 func (self *diskChain) Head() common.Block {
 	head := self.rw.head()
 	if head == nil {
-		return self.rw.getBlock(common.FirstHeight - 1) // hack implement
+		return self.rw.getBlock(common.EmptyHeight) // hack implement
 	}
 
 	return head
@@ -700,6 +700,11 @@ func (self *blockPool) compound(w *PoolBlock) {
 	self.compoundBlocks[w.block.Hash()] = w
 	delete(self.freeBlocks, w.block.Hash())
 }
+func (self *blockPool) afterInsert(w *PoolBlock) {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	delete(self.compoundBlocks, w.block.Hash())
+}
 
 func (self *BCPool) AddBlock(block common.Block) {
 	wrapper := &PoolBlock{block: block, forkVersion: self.version.Val(), v: self.version}
@@ -727,6 +732,9 @@ func (a ByTailHeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByTailHeight) Less(i, j int) bool { return a[i].tailHeight < a[j].tailHeight }
 
 func (self *BCPool) loopGenSnippetChains() int {
+	if len(self.blockpool.freeBlocks) == 0 {
+		return 0
+	}
 
 	i := 0
 	//  self.chainpool.snippetChains
@@ -837,7 +845,7 @@ func (self *BCPool) loopFetchForSnippets() int {
 	prev := zero
 
 	for _, w := range sortSnippets {
-		diff := zero
+		diff := big.NewInt(0)
 		tailHeight := new(big.Int).SetUint64(w.tailHeight)
 		// prev > 0
 		if prev.Cmp(zero) > 0 {

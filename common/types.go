@@ -246,7 +246,7 @@ func NewAccountBlockFrom(
 	return block
 }
 
-type NetMsgType int
+type NetMsgType uint8
 
 const (
 	PeerConnected         NetMsgType = 1
@@ -263,3 +263,11 @@ const (
 )
 
 var FirstHeight = uint64(1)
+var EmptyHeight = uint64(0)
+
+type StoreDBType uint8
+
+const (
+	Memory  StoreDBType = 1
+	LevelDB StoreDBType = 2
+)

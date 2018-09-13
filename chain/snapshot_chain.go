@@ -68,6 +68,10 @@ func (self *snapshotChain) GetBlockByHashH(hashH common.HashHeight) *common.Snap
 		log.Error("can't request height 0 block.[snapshotChain]", hashH.Height)
 		return nil
 	}
+	head := self.head
+	if hashH.Height == head.Height() && hashH.Hash == head.Hash() {
+		return head
+	}
 	block := self.store.GetSnapshotByHeight(hashH.Height)
 	if block != nil && hashH.Hash == block.Hash() {
 		return block

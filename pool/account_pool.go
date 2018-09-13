@@ -234,6 +234,8 @@ func (self *accountPool) tryInsert() verifier.Task {
 					log.Error("account block write fail. block info:account[%s],hash[%s],height[%d], err:%v",
 						result, block.Signer(), block.Hash(), block.Height(), err)
 					return verifier.NewFailTask()
+				} else {
+					self.blockpool.afterInsert(wrapper)
 				}
 			} else {
 				return verifier.NewSuccessTask()

@@ -3,7 +3,11 @@ package store
 import (
 	"time"
 
+	"path"
+
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/config"
+	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/tools"
 )
 
@@ -39,5 +43,17 @@ func init() {
 			200, 0, 0, "", common.GENESIS, a, a, nil)
 		genesis.SetHash(tools.CalculateAccountHash(genesis))
 		genesisBlocks = append(genesisBlocks, genesis)
+	}
+}
+
+func NewStore(cfg *config.Chain) BlockStore {
+	if cfg.StoreType == common.Memory {
+		log.Info("store use memory db.")
+		return newMemoryStore()
+	} else if cfg.StoreType == common.LevelDB {
+		log.Info("store use leveldb.")
+		return newBlockLeveldbStore(path.Join(cfg.DataDir, cfg.DBPath))
+	} else {
+		panic("unknown StoreType")
 	}
 }

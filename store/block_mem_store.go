@@ -8,7 +8,7 @@ import (
 	"github.com/viteshan/naive-vite/common"
 )
 
-func NewMemoryStore(snapshotGenesis *common.SnapshotBlock) BlockStore {
+func newMemoryStore() BlockStore {
 	self := &blockMemoryStore{}
 	for _, genesis := range genesisBlocks {
 		self.PutAccount(genesis.Signer(), genesis)

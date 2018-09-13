@@ -9,7 +9,7 @@ import (
 	"github.com/viteshan/naive-vite/store/serializer/gencode"
 )
 
-func NewBlockLeveldbStore(path string) BlockStore {
+func newBlockLeveldbStore(path string) BlockStore {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		panic(err)

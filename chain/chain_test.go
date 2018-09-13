@@ -30,3 +30,6 @@ func TestGenesis(t *testing.T) {
 	var genesisSnapshot = common.NewSnapshotBlock(0, "a601ad0af8123a9dd85a201273276a82e41d6cc1e708bd62ea432dea76038639", "", "viteshan", time.Unix(1533550878, 0), genesisAcc)
 	fmt.Println(tools.CalculateSnapshotHash(genesisSnapshot))
 }
+
+func TestInsert(t *testing.T) {
+}

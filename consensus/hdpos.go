@@ -101,7 +101,7 @@ func NewCommittee(genesisTime time.Time, interval int32, memberCnt int32) *Commi
 	committee.teller = newTeller(genesisTime, interval, memberCnt)
 	return committee
 }
-func NewConsensus(genesisTime time.Time, cfg config.Consensus) Consensus {
+func NewConsensus(genesisTime time.Time, cfg *config.Consensus) Consensus {
 	committee := &Committee{interval: cfg.Interval, memberCnt: cfg.MemCnt}
 	committee.teller = newTeller(genesisTime, int32(cfg.Interval), int32(cfg.MemCnt))
 	return committee
