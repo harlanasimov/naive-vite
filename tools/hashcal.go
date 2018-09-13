@@ -18,26 +18,28 @@ func calculateHash(s string) string {
 }
 
 func CalculateAccountHash(block *common.AccountStateBlock) string {
-	return calculateHash(blockStr(block) + strconv.Itoa(block.Amount) +
+	str := blockStr(block) + strconv.Itoa(block.Amount) +
 		strconv.Itoa(block.ModifiedAmount) +
-		strconv.Itoa(block.SnapshotHeight) +
+		strconv.FormatUint(block.SnapshotHeight, 10) +
 		block.SnapshotHash +
 		block.BlockType.String() +
 		block.From +
-		block.To +
-		block.SourceHash +
-		strconv.Itoa(block.SourceHeight))
+		block.To
+	if block.Source != nil {
+		str += block.Source.Hash + strconv.FormatUint(block.Source.Height, 10)
+	}
+	return calculateHash(str)
 }
 
 func blockStr(block common.Block) string {
-	return strconv.FormatInt(block.Timestamp().Unix(), 10) + string(block.Signer()) + string(block.PreHash()) + strconv.Itoa(block.Height())
+	return strconv.FormatInt(block.Timestamp().Unix(), 10) + string(block.Signer()) + string(block.PreHash()) + strconv.FormatUint(block.Height(), 10)
 }
 
 func CalculateSnapshotHash(block *common.SnapshotBlock) string {
 	accStr := ""
 	if block.Accounts != nil {
 		for _, account := range block.Accounts {
-			accStr = accStr + strconv.Itoa(account.Height) + account.Hash + account.Addr
+			accStr = accStr + strconv.FormatUint(account.Height, 10) + account.Hash + account.Addr
 		}
 	}
 	record := blockStr(block) + accStr

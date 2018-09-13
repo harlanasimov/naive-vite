@@ -169,11 +169,11 @@ func (self *snapshotPendingTask) Done() bool {
 	return false
 }
 
-func (self *verifyTask) pendingSnapshot(hash string, height int) {
+func (self *verifyTask) pendingSnapshot(hash string, height uint64) {
 	request := face.FetchRequest{Chain: "", Hash: hash, Height: height, PrevCnt: 1}
 	self.tasks = append(self.tasks, &snapshotPendingTask{self.reader, false, request})
 }
-func (self *verifyTask) pendingAccount(addr string, height int, hash string, prevCnt int) {
+func (self *verifyTask) pendingAccount(addr string, height uint64, hash string, prevCnt uint64) {
 	request := face.FetchRequest{Chain: addr, Hash: hash, Height: height, PrevCnt: prevCnt}
 	self.tasks = append(self.tasks, &accountPendingTask{self.reader, false, request})
 }

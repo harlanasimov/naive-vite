@@ -43,8 +43,8 @@ func (self *accountChain) Head() *common.AccountStateBlock {
 	return self.head
 }
 
-func (self *accountChain) GetBlockByHeight(height int) *common.AccountStateBlock {
-	if height < 0 {
+func (self *accountChain) GetBlockByHeight(height uint64) *common.AccountStateBlock {
+	if height < common.FirstHeight {
 		log.Error("can't request height 0 block. account:%s", self.address)
 		return nil
 	}
@@ -54,7 +54,7 @@ func (self *accountChain) GetBlockByHeight(height int) *common.AccountStateBlock
 }
 
 func (self *accountChain) GetBlockByHashH(hashH common.HashHeight) *common.AccountStateBlock {
-	if hashH.Height < 0 {
+	if hashH.Height < common.FirstHeight {
 		log.Error("can't request height 0 block. account:%s", self.address)
 		return nil
 	}
@@ -64,8 +64,8 @@ func (self *accountChain) GetBlockByHashH(hashH common.HashHeight) *common.Accou
 	}
 	return nil
 }
-func (self *accountChain) GetBlockByHash(hash string) *common.AccountStateBlock {
-	block := self.store.GetAccountByHash(hash)
+func (self *accountChain) GetBlockByHash(address string, hash string) *common.AccountStateBlock {
+	block := self.store.GetAccountByHash(address, hash)
 	return block
 }
 
@@ -78,7 +78,7 @@ func (self *accountChain) insertChain(block *common.AccountStateBlock) error {
 	self.store.SetAccountHead(self.address, &common.HashHeight{Hash: block.Hash(), Height: block.Height()})
 
 	if block.BlockType == common.RECEIVED {
-		self.store.PutSourceHash(block.SourceHash, block)
+		self.store.PutSourceHash(block.Source.Hash, common.NewAccountHashH(self.address, block.Hash(), block.Height()))
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (self *accountChain) removeChain(block *common.AccountStateBlock) error {
 		return errors.New("has snapshot.")
 	}
 
-	head := self.store.GetAccountByHash(block.Hash())
+	head := self.store.GetAccountByHash(self.address, block.Hash())
 	self.store.DeleteAccount(self.address, common.HashHeight{Hash: block.Hash(), Height: block.Height()})
 	self.listener.AccountRemoveCallback(self.address, block)
 	self.head = head
@@ -99,12 +99,12 @@ func (self *accountChain) removeChain(block *common.AccountStateBlock) error {
 		self.store.SetAccountHead(self.address, &common.HashHeight{Hash: head.Hash(), Height: head.Height()})
 	}
 	if block.BlockType == common.RECEIVED {
-		self.store.DeleteSourceHash(block.SourceHash)
+		self.store.DeleteSourceHash(block.Source.Hash)
 	}
 	return nil
 }
 
-func (self *accountChain) findAccountAboveSnapshotHeight(snapshotHeight int) *common.AccountStateBlock {
+func (self *accountChain) findAccountAboveSnapshotHeight(snapshotHeight uint64) *common.AccountStateBlock {
 	if self.head == nil {
 		return nil
 	}
@@ -124,14 +124,14 @@ func (self *accountChain) getBySourceBlock(sourceHash string) *common.AccountSta
 	for i := height; i > 0; i-- {
 		// first block(i==0) is create block
 		v := self.store.GetAccountByHeight(self.address, i)
-		if v.BlockType == common.RECEIVED && v.SourceHash == sourceHash {
+		if v.BlockType == common.RECEIVED && v.Source.Hash == sourceHash {
 			return v
 		}
 	}
 	return nil
 }
 
-func (self *accountChain) NextSnapshotPoint() (int, string) {
+func (self *accountChain) NextSnapshotPoint() (*common.AccountHashH, error) {
 	var lastPoint *common.SnapshotPoint
 	p := self.snapshotPoint.Peek()
 	if p != nil {
@@ -140,17 +140,17 @@ func (self *accountChain) NextSnapshotPoint() (int, string) {
 
 	if lastPoint == nil {
 		if self.head != nil {
-			return self.head.Height(), self.head.Hash()
+			return common.NewAccountHashH(self.address, self.head.Hash(), self.head.Height()), nil
 		}
 	} else {
 		if lastPoint.AccountHeight < self.head.Height() {
-			return self.head.Height(), self.head.Hash()
+			return common.NewAccountHashH(self.address, self.head.Hash(), self.head.Height()), nil
 		}
 	}
-	return -1, ""
+	return nil, errors.New("not found")
 }
 
-func (self *accountChain) SnapshotPoint(snapshotHeight int, snapshotHash string, h *common.AccountHashH) error {
+func (self *accountChain) SnapshotPoint(snapshotHeight uint64, snapshotHash string, h *common.AccountHashH) error {
 	// check valid
 	head := self.head
 	if head == nil {
@@ -175,9 +175,9 @@ func (self *accountChain) SnapshotPoint(snapshotHeight int, snapshotHash string,
 		self.snapshotPoint.Push(point)
 		return nil
 	} else {
-		errMsg := "account[" + self.address + "] state error. accHeight: " + strconv.Itoa(h.Height) +
+		errMsg := "account[" + self.address + "] state error. accHeight: " + strconv.FormatUint(h.Height, 10) +
 			"accHash:" + h.Hash +
-			" expAccHeight:" + strconv.Itoa(point.Height()) +
+			" expAccHeight:" + strconv.FormatUint(point.Height(), 10) +
 			" expAccHash:" + point.Hash()
 		return errors.New(errMsg)
 	}
@@ -187,7 +187,7 @@ func (self *accountChain) SnapshotPoint(snapshotHeight int, snapshotHash string,
 func (self *accountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end *common.SnapshotPoint) error {
 	point := self.peek()
 	if point == nil {
-		return errors.New("not exist snapshot point.")
+		return errors.New("not exist snapshot point")
 	}
 	if !point.Equals(start) {
 		return errors.New("not equals for start")
@@ -195,7 +195,7 @@ func (self *accountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end
 	for {
 		point := self.peek()
 		if point == nil {
-			return errors.New("not exist snapshot point.")
+			return errors.New("not exist snapshot point")
 		}
 		if point.AccountHeight <= end.AccountHeight {
 			self.snapshotPoint.Pop()
@@ -229,7 +229,7 @@ func (self *accountChain) RollbackSnapshotPoint(start *common.SnapshotPoint, end
 //}
 
 //SnapshotPoint ddd
-func (self *accountChain) hasSnapshotPoint(accountHeight int, accountHash string) bool {
+func (self *accountChain) hasSnapshotPoint(accountHeight uint64, accountHash string) bool {
 	point := self.peek()
 	if point == nil {
 		return false

@@ -4,11 +4,11 @@ import "strconv"
 
 type FetchRequest struct {
 	Chain   string
-	Height  int
+	Height  uint64
 	Hash    string
-	PrevCnt int
+	PrevCnt uint64
 }
 
 func (self *FetchRequest) String() string {
-	return self.Chain + "," + strconv.Itoa(self.Height) + "," + self.Hash + "," + strconv.Itoa(self.PrevCnt)
+	return self.Chain + "," + strconv.FormatUint(self.Height, 10) + "," + self.Hash + "," + strconv.FormatUint(self.PrevCnt, 10)
 }

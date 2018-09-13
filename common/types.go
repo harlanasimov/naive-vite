@@ -6,7 +6,7 @@ import (
 )
 
 type Block interface {
-	Height() int
+	Height() uint64
 	Hash() string
 	PreHash() string
 	Signer() string
@@ -15,7 +15,7 @@ type Block interface {
 
 type HashHeight struct {
 	Hash   string
-	Height int
+	Height uint64
 }
 
 type AccountHashH struct {
@@ -23,7 +23,7 @@ type AccountHashH struct {
 	Addr string
 }
 
-func NewAccountHashH(address string, hash string, height int) *AccountHashH {
+func NewAccountHashH(address string, hash string, height uint64) *AccountHashH {
 	self := &AccountHashH{}
 	self.Addr = address
 	self.Hash = hash
@@ -32,9 +32,9 @@ func NewAccountHashH(address string, hash string, height int) *AccountHashH {
 }
 
 type SnapshotPoint struct {
-	SnapshotHeight int
+	SnapshotHeight uint64
 	SnapshotHash   string
-	AccountHeight  int
+	AccountHeight  uint64
 	AccountHash    string
 }
 
@@ -52,11 +52,11 @@ func (self *SnapshotPoint) Equals(peer *SnapshotPoint) bool {
 }
 
 func (self *SnapshotPoint) String() string {
-	return "[" + strconv.Itoa(self.SnapshotHeight) + "][" + self.SnapshotHash + "][" + strconv.Itoa(self.AccountHeight) + "][" + self.AccountHash + "]"
+	return "[" + strconv.FormatUint(self.SnapshotHeight, 10) + "][" + self.SnapshotHash + "][" + strconv.FormatUint(self.AccountHeight, 10) + "][" + self.AccountHash + "]"
 }
 
 //BlockType is the type of Tx described by int.
-type BlockType int
+type BlockType uint8
 
 // BlockType types.
 const (
@@ -102,14 +102,14 @@ func (self NetMsgType) String() string {
 }
 
 type Tblock struct {
-	Theight    int
+	Theight    uint64
 	Thash      string
 	TpreHash   string
 	Tsigner    string
 	Ttimestamp time.Time
 }
 
-func (self *Tblock) Height() int {
+func (self *Tblock) Height() uint64 {
 	return self.Theight
 }
 
@@ -135,13 +135,12 @@ type AccountStateBlock struct {
 	Tblock
 	Amount         int // the balance
 	ModifiedAmount int
-	SnapshotHeight int
+	SnapshotHeight uint64
 	SnapshotHash   string
 	BlockType      BlockType // 1: send  2:received
 	From           string
 	To             string
-	SourceHash     string // source Block Thash
-	SourceHeight   int
+	Source         *HashHeight
 }
 
 type SnapshotBlock struct {
@@ -150,7 +149,7 @@ type SnapshotBlock struct {
 }
 
 func NewSnapshotBlock(
-	height int,
+	height uint64,
 	hash string,
 	preHash string,
 	signer string,
@@ -179,7 +178,7 @@ func (self Address) String() string {
 }
 
 func NewAccountBlock(
-	height int,
+	height uint64,
 	hash string,
 	preHash string,
 	signer string,
@@ -187,13 +186,12 @@ func NewAccountBlock(
 
 	amount int,
 	modifiedAmount int,
-	snapshotHeight int,
+	snapshotHeight uint64,
 	snapshotHash string,
 	blockType BlockType,
 	from string,
 	to string,
-	sourceHash string,
-	sourceHeight int,
+	source *HashHeight,
 ) *AccountStateBlock {
 
 	block := &AccountStateBlock{}
@@ -209,8 +207,7 @@ func NewAccountBlock(
 	block.BlockType = blockType
 	block.From = from
 	block.To = to
-	block.SourceHash = sourceHash
-	block.SourceHeight = sourceHeight
+	block.Source = source
 	return block
 }
 
@@ -225,8 +222,7 @@ func NewAccountBlockFrom(
 	blockType BlockType,
 	from string,
 	to string,
-	sourceHash string,
-	sourceHeight int,
+	source *HashHeight,
 ) *AccountStateBlock {
 	block := &AccountStateBlock{}
 	if accountBlock == nil {
@@ -246,8 +242,7 @@ func NewAccountBlockFrom(
 	block.BlockType = blockType
 	block.From = from
 	block.To = to
-	block.SourceHash = sourceHash
-	block.SourceHeight = sourceHeight
+	block.Source = source
 	return block
 }
 
@@ -266,3 +261,5 @@ const (
 	AccountBlocks         NetMsgType = 123
 	SnapshotBlocks        NetMsgType = 124
 )
+
+var FirstHeight = uint64(1)

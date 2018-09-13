@@ -1,9 +1,9 @@
 package pool
 
 import (
-	"time"
-
 	"strconv"
+
+	"time"
 
 	"github.com/pkg/errors"
 	ch "github.com/viteshan/naive-vite/chain"
@@ -16,7 +16,7 @@ type chainRw interface {
 	removeChain(block common.Block) error
 
 	head() common.Block
-	getBlock(height int) common.Block
+	getBlock(height uint64) common.Block
 }
 
 type accountCh struct {
@@ -44,9 +44,9 @@ func (self *accountCh) head() common.Block {
 	return block
 }
 
-func (self *accountCh) getBlock(height int) common.Block {
-	if height == -1 {
-		return common.NewAccountBlock(-1, "", "", "", time.Unix(0, 0), 0, 0, 0, "", common.SEND, "", "", "", -1)
+func (self *accountCh) getBlock(height uint64) common.Block {
+	if height == common.FirstHeight-1 {
+		return common.NewAccountBlock(height, "", "", "", time.Unix(0, 0), 0, 0, 0, "", common.SEND, "", "", nil)
 	}
 	block := self.bc.GetAccountByHeight(self.address, height)
 	if block == nil {
@@ -54,7 +54,7 @@ func (self *accountCh) getBlock(height int) common.Block {
 	}
 	return block
 }
-func (self *accountCh) findAboveSnapshotHeight(height int) *common.AccountStateBlock {
+func (self *accountCh) findAboveSnapshotHeight(height uint64) *common.AccountStateBlock {
 	return self.bc.FindAccountAboveSnapshotHeight(self.address, height)
 }
 
@@ -63,7 +63,7 @@ type snapshotCh struct {
 	version *version.Version
 }
 
-func (self *snapshotCh) getBlock(height int) common.Block {
+func (self *snapshotCh) getBlock(height uint64) common.Block {
 	head := self.bc.GetSnapshotByHeight(height)
 	if head == nil {
 		return nil

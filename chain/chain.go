@@ -28,7 +28,8 @@ type blockchain struct {
 
 func NewChain() BlockChain {
 	self := &blockchain{}
-	self.store = store.NewMemoryStore(GetGenesisSnapshot())
+	//self.store = store.NewMemoryStore(GetGenesisSnapshot())
+	self.store = store.NewBlockLeveldbStore("/Users/jie/naive_vite/data/chain.db")
 	self.sc = newSnapshotChain(self.store)
 	self.listener = &defaultChainListener{}
 	return self
@@ -67,11 +68,11 @@ func (self *blockchain) NextAccountSnapshot() (common.HashHeight, []*common.Acco
 	//common.SnapshotBlock{}
 	var accounts []*common.AccountHashH
 	self.ac.Range(func(k, v interface{}) bool {
-		i, s := v.(*accountChain).NextSnapshotPoint()
-		if i < 0 {
+		a, e := v.(*accountChain).NextSnapshotPoint()
+		if e != nil {
 			return true
 		}
-		accounts = append(accounts, common.NewAccountHashH(k.(string), s, i))
+		accounts = append(accounts, a)
 		return true
 	})
 	if len(accounts) == 0 {
@@ -81,7 +82,7 @@ func (self *blockchain) NextAccountSnapshot() (common.HashHeight, []*common.Acco
 	return common.HashHeight{Hash: head.Hash(), Height: head.Height()}, accounts, nil
 }
 
-func (self *blockchain) FindAccountAboveSnapshotHeight(address string, snapshotHeight int) *common.AccountStateBlock {
+func (self *blockchain) FindAccountAboveSnapshotHeight(address string, snapshotHeight uint64) *common.AccountStateBlock {
 	return self.selfAc(address).findAccountAboveSnapshotHeight(snapshotHeight)
 }
 
@@ -108,7 +109,7 @@ func (self *blockchain) GetSnapshotByHash(hash string) *common.SnapshotBlock {
 	return self.sc.getBlockByHash(hash)
 }
 
-func (self *blockchain) GetSnapshotByHeight(height int) *common.SnapshotBlock {
+func (self *blockchain) GetSnapshotByHeight(height uint64) *common.SnapshotBlock {
 	return self.sc.GetBlockHeight(height)
 }
 
@@ -140,10 +141,10 @@ func (self *blockchain) GetAccountByHashH(address string, hashH common.HashHeigh
 }
 
 func (self *blockchain) GetAccountByHash(address string, hash string) *common.AccountStateBlock {
-	return self.selfAc(address).GetBlockByHash(hash)
+	return self.selfAc(address).GetBlockByHash(address, hash)
 }
 
-func (self *blockchain) GetAccountByHeight(address string, height int) *common.AccountStateBlock {
+func (self *blockchain) GetAccountByHeight(address string, height uint64) *common.AccountStateBlock {
 	return self.selfAc(address).GetBlockByHeight(height)
 }
 

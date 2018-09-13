@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"math/big"
+
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
@@ -21,21 +23,21 @@ type PoolReader interface {
 	Chains() []Chain
 }
 type Chain interface {
-	HeadHeight() int
+	HeadHeight() uint64
 	ChainId() string
 	Head() common.Block
-	GetBlock(height int) common.Block
+	GetBlock(height uint64) common.Block
 }
 
 type ChainReader interface {
 	Head() common.Block
-	GetBlock(height int) common.Block
+	GetBlock(height uint64) common.Block
 }
 
 type heightChainReader interface {
 	id() string
-	getBlock(height int, refer bool) *PoolBlock
-	contains(height int) bool
+	getBlock(height uint64, refer bool) *PoolBlock
+	contains(height uint64) bool
 	Head() common.Block
 }
 
@@ -87,7 +89,7 @@ type diskChain struct {
 	v       *version.Version
 }
 
-func (self *diskChain) getBlock(height int, refer bool) *PoolBlock {
+func (self *diskChain) getBlock(height uint64, refer bool) *PoolBlock {
 	if height < 0 {
 		return nil
 	}
@@ -109,7 +111,7 @@ func (self *diskChain) getBlockBetween(tail int, head int, refer bool) *PoolBloc
 	return nil
 }
 
-func (self *diskChain) contains(height int) bool {
+func (self *diskChain) contains(height uint64) bool {
 	return self.rw.head().Height() >= height
 }
 
@@ -120,7 +122,7 @@ func (self *diskChain) id() string {
 func (self *diskChain) Head() common.Block {
 	head := self.rw.head()
 	if head == nil {
-		return self.rw.getBlock(-1) // hack implement
+		return self.rw.getBlock(common.FirstHeight - 1) // hack implement
 	}
 
 	return head
@@ -137,16 +139,16 @@ func (self *BlockVerifySuccessStat) VerifyResult() verifier.VerifyResult {
 }
 
 type chain struct {
-	heightBlocks map[int]*PoolBlock
-	headHeight   int //  forkedChain size is zero when headHeight==tailHeight
-	tailHeight   int
+	heightBlocks map[uint64]*PoolBlock
+	headHeight   uint64 //  forkedChain size is zero when headHeight==tailHeight
+	tailHeight   uint64
 	chainId      string
 }
 
-func (self *chain) size() int {
+func (self *chain) size() uint64 {
 	return self.headHeight - self.tailHeight
 }
-func (self *chain) HeadHeight() int {
+func (self *chain) HeadHeight() uint64 {
 	return self.headHeight
 }
 
@@ -165,7 +167,7 @@ type snippetChain struct {
 }
 
 func (self *snippetChain) init(w *PoolBlock) {
-	self.heightBlocks = make(map[int]*PoolBlock)
+	self.heightBlocks = make(map[uint64]*PoolBlock)
 	self.headHeight = w.block.Height()
 	self.headHash = w.block.Hash()
 	self.tailHash = w.block.PreHash()
@@ -208,7 +210,7 @@ type forkedChain struct {
 	referChain heightChainReader
 }
 
-func (self *forkedChain) getBlock(height int, refer bool) *PoolBlock {
+func (self *forkedChain) getBlock(height uint64, refer bool) *PoolBlock {
 	block, ok := self.heightBlocks[height]
 	if ok {
 		return block
@@ -223,7 +225,7 @@ func (self *forkedChain) Head() common.Block {
 	return self.GetBlock(self.headHeight)
 }
 
-func (self *forkedChain) GetBlock(height int) common.Block {
+func (self *forkedChain) GetBlock(height uint64) common.Block {
 	w := self.getBlock(height, true)
 	if w == nil {
 		return nil
@@ -231,7 +233,7 @@ func (self *forkedChain) GetBlock(height int) common.Block {
 	return w.block
 }
 
-func (self *forkedChain) contains(height int) bool {
+func (self *forkedChain) contains(height uint64) bool {
 	return height > self.tailHeight && self.headHeight <= height
 }
 
@@ -395,7 +397,7 @@ func (self *chainPool) forky(snippet *snippetChain, chains []*forkedChain) (bool
 	}
 	return false, false, nil
 }
-func cutSnippet(snippet *snippetChain, height int) {
+func cutSnippet(snippet *snippetChain, height uint64) {
 	for {
 		tail := snippet.remTail()
 		if tail == nil {
@@ -537,15 +539,12 @@ func (self *chainPool) insert(c *forkedChain, wrapper *PoolBlock) error {
 //func (self *BCPool) Rollback(new common.Block) error {
 //	return self.chainpool.rollback(new.Height())
 //}
-func (self *BCPool) Rollback(rollbackHeight int, rollbackHash string) error {
+func (self *BCPool) Rollback(rollbackHeight uint64, rollbackHash string) error {
 	// todo add hash
 	return self.chainpool.rollback(rollbackHeight, self.version.Val())
 }
-func (self *BCPool) RollbackAll() error {
-	return self.chainpool.rollback(-1, self.version.Val())
-}
 
-func (self *chainPool) rollback(newHeight int, forkVersion int) error {
+func (self *chainPool) rollback(newHeight uint64, forkVersion int) error {
 	height := self.current.tailHeight
 	log.Warn("chain[%s] rollback. from:%d, to:%d", self.current.id(), height, newHeight)
 	for i := height; i > newHeight; i-- {
@@ -642,7 +641,7 @@ func (self *chainPool) printChains() {
 //}
 
 func (self *forkedChain) init(initBlock common.Block) {
-	self.heightBlocks = make(map[int]*PoolBlock)
+	self.heightBlocks = make(map[uint64]*PoolBlock)
 	self.tailHeight = initBlock.Height()
 	self.tailHash = initBlock.Hash()
 	self.headHeight = initBlock.Height()
@@ -669,9 +668,9 @@ func (self *forkedChain) addTail(w *PoolBlock) {
 
 func (self *forkedChain) String() string {
 	return "chainId:\t" + self.chainId + "\n" +
-		"headHeight:\t" + strconv.Itoa(self.headHeight) + "\n" +
+		"headHeight:\t" + strconv.FormatUint(self.headHeight, 10) + "\n" +
 		"headHash:\t" + "[" + self.headHash + "]\t" + "\n" +
-		"tailHeight:\t" + strconv.Itoa(self.tailHeight)
+		"tailHeight:\t" + strconv.FormatUint(self.tailHeight, 10)
 }
 
 type PoolBlock struct {
@@ -687,7 +686,7 @@ func (self *PoolBlock) reset() {
 	forkVersion := self.v.Val()
 	self.forkVersion = forkVersion
 }
-func (self *blockPool) contains(hash string, height int) bool {
+func (self *blockPool) contains(hash string, height uint64) bool {
 	_, free := self.freeBlocks[hash]
 	_, compound := self.compoundBlocks[hash]
 	return free || compound
@@ -832,35 +831,38 @@ func (self *BCPool) loopFetchForSnippets() int {
 	sortSnippets := copyMap(self.chainpool.snippetChains)
 	sort.Sort(ByTailHeight(sortSnippets))
 
-	head := self.chainpool.current.headHeight
+	head := new(big.Int).SetUint64(self.chainpool.current.headHeight)
 	i := 0
-	prev := -1
+	zero := big.NewInt(0)
+	prev := zero
 
 	for _, w := range sortSnippets {
-		diff := 0
-		if prev > 0 {
-			diff = w.tailHeight - prev
+		diff := zero
+		tailHeight := new(big.Int).SetUint64(w.tailHeight)
+		// prev > 0
+		if prev.Cmp(zero) > 0 {
+			diff.Sub(tailHeight, prev)
 		} else {
 			// first snippet
-			diff = w.tailHeight - head
+			diff.Sub(tailHeight, head)
 		}
 
 		// prev and this chains have fork
-		if diff <= 0 {
-			diff = w.tailHeight - head
+		if diff.Cmp(zero) <= 0 {
+			diff.Sub(tailHeight, head)
 		}
 
 		// lower than the current chain
-		if diff <= 0 {
-			diff = 20
+		if diff.Cmp(zero) <= 0 {
+			diff.SetUint64(20)
 		}
 
-		if diff > 0 {
+		if diff.Cmp(zero) > 0 {
 			i++
 			hash := common.HashHeight{Hash: w.tailHash, Height: w.tailHeight}
-			self.syncer.fetch(hash, diff)
+			self.syncer.fetch(hash, diff.Uint64())
 		}
-		prev = w.headHeight
+		prev.SetUint64(w.headHeight)
 	}
 	return i
 }
@@ -870,7 +872,7 @@ func (self *BCPool) loopFetchForSnippets() int {
 //	self.chainpool.check(nil, nil)
 //}
 
-func (self *BCPool) whichChain(height int, hash string) *forkedChain {
+func (self *BCPool) whichChain(height uint64, hash string) *forkedChain {
 	var finalChain *forkedChain
 	for _, chain := range self.chainpool.chains {
 		block := chain.getBlock(height, false)
@@ -896,7 +898,7 @@ func (self *BCPool) whichChain(height int, hash string) *forkedChain {
 }
 
 // fork point must be in memory
-func (self *BCPool) currentModify(forkHeight int, forkHash string) error {
+func (self *BCPool) currentModify(forkHeight uint64, forkHash string) error {
 	var finalChain *forkedChain
 	//forkHeight := target.Height
 	//forkHash := target.Hash

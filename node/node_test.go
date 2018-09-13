@@ -162,30 +162,32 @@ func TestBenchmark(t *testing.T) {
 	n := startNode(defaultBoot, 8081, "100")
 	time.Sleep(time.Second)
 
-	balance := n.Leger().GetAccountBalance("jie")
-	if balance != 200 {
-		t.Error("balance is wrong.", balance, 200)
+	jieBalance := n.Leger().GetAccountBalance("jie")
+	if jieBalance != 200 {
+		t.Error("balance is wrong.", jieBalance, 200)
 	}
 
-	balance = n.Leger().GetAccountBalance("viteshan")
-	if balance != 200 {
-		t.Error("balance is wrong.", balance, 200)
+	viteshanBalance := n.Leger().GetAccountBalance("viteshan")
+	if viteshanBalance != 200 {
+		t.Error("balance is wrong.", viteshanBalance, 200)
 	}
 	N := 4
-	for i := 0; i < N; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("jie", addr, -30)
-		if err != nil {
-			log.Error("%v", err)
-			return
+	if jieBalance == 200 && viteshanBalance == 200 {
+		for i := 0; i < N; i++ {
+			addr := "jie" + strconv.Itoa(i)
+			err := n.Leger().RequestAccountBlock("jie", addr, -30)
+			if err != nil {
+				log.Error("%v", err)
+				return
+			}
 		}
-	}
-	for i := 0; i < N; i++ {
-		addr := "jie" + strconv.Itoa(i)
-		err := n.Leger().RequestAccountBlock("viteshan", addr, -30)
-		if err != nil {
-			log.Error("%v", err)
-			return
+		for i := 0; i < N; i++ {
+			addr := "jie" + strconv.Itoa(i)
+			err := n.Leger().RequestAccountBlock("viteshan", addr, -30)
+			if err != nil {
+				log.Error("%v", err)
+				return
+			}
 		}
 	}
 

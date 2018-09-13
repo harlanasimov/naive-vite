@@ -62,7 +62,7 @@ func (self *reqPool) blockInsert(block *common.AccountStateBlock) {
 		account.reqs[req.ReqHash] = req
 	} else if block.BlockType == common.RECEIVED {
 		//delete(self.account(block.To).reqs, block.SourceHash)
-		req := self.getReq(block.To, block.SourceHash)
+		req := self.getReq(block.To, block.Source.Hash)
 		req.state = 1
 		req.acc = common.NewAccountHashH(block.To, block.Hash(), block.Height())
 	}
@@ -77,7 +77,7 @@ func (self *reqPool) blockRollback(block *common.AccountStateBlock) {
 	} else if block.BlockType == common.RECEIVED {
 		//req := &Req{reqHash: block.SourceHash}
 		//self.account(block.To).reqs[req.reqHash] = req
-		self.getReq(block.To, block.SourceHash).state = 2
+		self.getReq(block.To, block.Source.Hash).state = 2
 	}
 }
 

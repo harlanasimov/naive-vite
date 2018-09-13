@@ -87,7 +87,7 @@ func (self *ledger) RequestAccountBlock(from string, to string, amount int) erro
 	headSnaphost, _ := self.bc.HeadSnapshot()
 
 	newBlock := common.NewAccountBlockFrom(headAccount, from, time.Now(), amount, headSnaphost,
-		common.SEND, from, to, "", -1)
+		common.SEND, from, to, nil)
 	newBlock.SetHash(tools.CalculateAccountHash(newBlock))
 	err := self.bpool.AddDirectAccountBlock(from, newBlock)
 	if err == nil {
@@ -106,19 +106,20 @@ func (self *ledger) ResponseAccountBlock(from string, to string, reqHash string)
 
 	reqBlock := b
 
-	prevHeight := -1
+	height := common.FirstHeight
 	prevHash := ""
 	prevAmount := 0
 	prev, _ := self.bc.HeadAccount(to)
 	if prev != nil {
-		prevHeight = prev.Height()
+		height = prev.Height() + 1
 		prevHash = prev.Hash()
 		prevAmount = prev.Amount
 	}
 	snapshotBlock, _ := self.bc.HeadSnapshot()
 
 	modifiedAmount := -reqBlock.ModifiedAmount
-	block := common.NewAccountBlock(prevHeight+1, "", prevHash, to, time.Now(), prevAmount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(), common.RECEIVED, from, to, reqHash, reqBlock.Height())
+	block := common.NewAccountBlock(height, "", prevHash, to, time.Now(), prevAmount+modifiedAmount, modifiedAmount, snapshotBlock.Height(), snapshotBlock.Hash(),
+		common.RECEIVED, from, to, &common.HashHeight{Hash: reqHash, Height: reqBlock.Height()})
 	block.SetHash(tools.CalculateAccountHash(block))
 
 	err := self.bpool.AddDirectAccountBlock(to, block)
@@ -161,7 +162,7 @@ func (self *ledger) ListSnapshotBlock() []*common.SnapshotBlock {
 	if head == nil {
 		return blocks
 	}
-	for i := 0; i < head.Height(); i++ {
+	for i := uint64(0); i < head.Height(); i++ {
 		blocks = append(blocks, self.bc.GetSnapshotByHeight(i))
 	}
 	if head.Height() >= 0 {
@@ -176,7 +177,7 @@ func (self *ledger) ListAccountBlock(address string) []*common.AccountStateBlock
 	if head == nil {
 		return blocks
 	}
-	for i := 0; i < head.Height(); i++ {
+	for i := uint64(0); i < head.Height(); i++ {
 		blocks = append(blocks, self.bc.GetAccountByHeight(address, i))
 	}
 	if head.Height() >= 0 {

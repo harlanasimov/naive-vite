@@ -23,11 +23,11 @@ func GetGenesisSnapshot() *common.SnapshotBlock {
 }
 
 var genesisAccounts = []*common.AccountHashH{
-	{common.HashHeight{Hash: "71cef9aa8a67df1055a0801e2fc251fe14a298b8fc1098a54e27db31f7a75e20", Height: 0}, "viteshan"},
-	{common.HashHeight{Hash: "c3e7ab31e4834cf18df6705b96c655c845db44f4ee315c6fba5232b4f965fcf0", Height: 0}, "jie"},
+	{common.HashHeight{Hash: "ccf131dac37a3ec9328290a9ad39c160baee02596daf303ad87d93815fce0a5a", Height: common.FirstHeight}, "viteshan"},
+	{common.HashHeight{Hash: "904196e430c52d0687064a1723fa5124da7708e7e82d75924a846c4e84ac49c3", Height: common.FirstHeight}, "jie"},
 }
 
-var genesisSnapshot = common.NewSnapshotBlock(0, "b5a3ee58d163c283e5c8c0f65ff5b26a5cd64cb9dce8119ac4581ebcb54626fd", "", "viteshan", time.Unix(1533550878, 0), genesisAccounts)
+var genesisSnapshot = common.NewSnapshotBlock(common.FirstHeight, "a601ad0af8123a9dd85a201273276a82e41d6cc1e708bd62ea432dea76038639", "", "viteshan", time.Unix(1533550878, 0), genesisAccounts)
 
 func newSnapshotChain(store store.BlockStore) *snapshotChain {
 	chain := &snapshotChain{}
@@ -53,9 +53,9 @@ func (self *snapshotChain) Head() *common.SnapshotBlock {
 	return self.head
 }
 
-func (self *snapshotChain) GetBlockHeight(height int) *common.SnapshotBlock {
+func (self *snapshotChain) GetBlockHeight(height uint64) *common.SnapshotBlock {
 	if height < 0 {
-		panic("height:" + strconv.Itoa(height))
+		panic("height:" + strconv.FormatUint(height, 10))
 		log.Error("can't request height 0 block.[snapshotChain]", height)
 		return nil
 	}

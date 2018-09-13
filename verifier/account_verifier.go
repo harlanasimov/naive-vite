@@ -37,7 +37,7 @@ func (self *AccountVerifier) verifyGenesis(block *common.AccountStateBlock, stat
 func (self *AccountVerifier) verifySelf(block *common.AccountStateBlock, stat *AccountBlockVerifyStat) bool {
 	defer monitor.LogTime("verify", "accountSelf", time.Now())
 	// self amount and response
-	if block.BlockType == common.RECEIVED && block.Height() == 0 {
+	if block.BlockType == common.RECEIVED && block.Height() == common.FirstHeight {
 		// check genesis block logic
 		genesisCheck := self.checkGenesis(block)
 		stat.referredSelfResult = genesisCheck
@@ -50,7 +50,7 @@ func (self *AccountVerifier) verifySelf(block *common.AccountStateBlock, stat *A
 	} else {
 		if block.BlockType == common.RECEIVED {
 			//check if it has been received
-			same := self.reader.GetAccountBySourceHash(block.To, block.SourceHash)
+			same := self.reader.GetAccountBySourceHash(block.To, block.Source.Hash)
 			if same != nil {
 				stat.errMsg = fmt.Sprintf("block[%s][%d][%s] error, send block has received.",
 					block.Signer(), block.Height(), block.Hash())
@@ -223,20 +223,14 @@ func (self *AccountVerifier) checkGenesis(block *common.AccountStateBlock) Verif
 }
 
 func (self *AccountVerifier) checkFromAmount(block *common.AccountStateBlock, stat *AccountBlockVerifyStat) VerifyResult {
-	source := self.reader.GetAccountByHeight(block.From, block.SourceHeight)
-	source2 := self.reader.GetAccountByHash(block.From, block.SourceHash)
-	if source != nil && source2 != nil {
-		if source2.Hash() != source.Hash() {
-			return FAIL
-		}
-	}
+	source := self.reader.GetAccountByHeight(block.From, block.Source.Height)
 	if source == nil {
-		stat.task.pendingAccount(block.From, block.SourceHeight, block.SourceHash, 1)
+		stat.task.pendingAccount(block.From, block.Source.Height, block.Source.Hash, 1)
 		return PENDING
 	}
-	if source.Hash() != block.SourceHash {
+	if source.Hash() != block.Source.Hash {
 		stat.errMsg = fmt.Sprintf("block[%s][%d][%s] error, source hash[%s][%s] error.",
-			block.Signer(), block.Height(), block.Hash(), block.SourceHash, source.Hash())
+			block.Signer(), block.Height(), block.Hash(), block.Source.Hash, source.Hash())
 		return FAIL
 	}
 

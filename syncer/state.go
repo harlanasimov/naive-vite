@@ -19,7 +19,7 @@ type syncPeer struct {
 	msg  *stateMsg
 }
 type syncTask struct {
-	height int
+	height uint64
 	hash   string
 	peer   p2p.Peer
 	closed chan struct{}
@@ -266,7 +266,7 @@ func (self *state) firstSyncDone() {
 
 func (self *state) bestPeer() p2p.Peer {
 	var r p2p.Peer
-	h := -1
+	h := uint64(0)
 
 	self.peers.Range(func(_, p interface{}) bool {
 		p1 := p.(*syncPeer)
@@ -274,7 +274,7 @@ func (self *state) bestPeer() p2p.Peer {
 		if s.S.Height > h {
 			r = p1.peer
 			h = s.S.Height
-			return false
+			return true
 		}
 		return true
 	})

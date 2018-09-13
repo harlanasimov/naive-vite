@@ -35,8 +35,8 @@ type chainRw struct {
 //}
 
 type Fetcher interface {
-	FetchAccount(address string, hash common.HashHeight, prevCnt int)
-	FetchSnapshot(hash common.HashHeight, prevCnt int)
+	FetchAccount(address string, hash common.HashHeight, prevCnt uint64)
+	FetchSnapshot(hash common.HashHeight, prevCnt uint64)
 	Fetch(request face.FetchRequest)
 }
 
@@ -52,8 +52,8 @@ type Sender interface {
 	SendAccountHashes(string, []common.HashHeight, p2p.Peer) error
 	SendSnapshotHashes([]common.HashHeight, p2p.Peer) error
 
-	RequestAccountHash(string, common.HashHeight, int) error
-	RequestSnapshotHash(common.HashHeight, int) error
+	RequestAccountHash(string, common.HashHeight, uint64) error
+	RequestSnapshotHash(common.HashHeight, uint64) error
 	RequestAccountBlocks(string, []common.HashHeight) error
 	RequestSnapshotBlocks([]common.HashHeight) error
 }

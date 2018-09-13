@@ -148,7 +148,7 @@ func (self *sender) SendSnapshotHashes(hashes []common.HashHeight, peer p2p.Peer
 
 }
 
-func (self *sender) RequestAccountHash(address string, height common.HashHeight, prevCnt int) error {
+func (self *sender) RequestAccountHash(address string, height common.HashHeight, prevCnt uint64) error {
 	log.Info("fetch account data, account:%s, height:%d, prevCnt:%d, hash:%s.", address, height.Height, prevCnt, height.Hash)
 	peer, e := self.net.BestPeer()
 	if e != nil {
@@ -168,7 +168,7 @@ func (self *sender) RequestAccountHash(address string, height common.HashHeight,
 	return err
 }
 
-func (self *sender) RequestSnapshotHash(height common.HashHeight, prevCnt int) error {
+func (self *sender) RequestSnapshotHash(height common.HashHeight, prevCnt uint64) error {
 	log.Info("fetch snapshot data, height:%d, prevCnt:%d, hash:%s.", height.Height, prevCnt, height.Hash)
 	peer, e := self.net.BestPeer()
 	if e != nil {

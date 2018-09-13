@@ -42,7 +42,7 @@ func (self *accountPool) Init(
 }
 
 // 1. must be in diskchain
-func (self *accountPool) TryRollback(rollbackHeight int, rollbackHash string) ([]*common.AccountStateBlock, error) {
+func (self *accountPool) TryRollback(rollbackHeight uint64, rollbackHash string) ([]*common.AccountStateBlock, error) {
 	{ // check logic
 		w := self.chainpool.diskChain.getBlock(rollbackHeight, false)
 		if w == nil || w.block.Hash() != rollbackHash {
@@ -69,7 +69,7 @@ func (self *accountPool) TryRollback(rollbackHeight int, rollbackHash string) ([
 }
 
 // rollback to current
-func (self *accountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, snapshotHash string) (bool, *common.AccountStateBlock, error) {
+func (self *accountPool) FindRollbackPointByReferSnapshot(snapshotHeight uint64, snapshotHash string) (bool, *common.AccountStateBlock, error) {
 	head := self.chainpool.diskChain.Head().(*common.AccountStateBlock)
 	if head.SnapshotHeight < snapshotHeight {
 		return false, nil, nil
@@ -83,7 +83,7 @@ func (self *accountPool) FindRollbackPointByReferSnapshot(snapshotHeight int, sn
 	}
 }
 
-func (self *accountPool) FindRollbackPointForAccountHashH(height int, hash string) (bool, *common.AccountStateBlock, Chain, error) {
+func (self *accountPool) FindRollbackPointForAccountHashH(height uint64, hash string) (bool, *common.AccountStateBlock, Chain, error) {
 	chain := self.whichChain(height, hash)
 	if chain == nil {
 		return false, nil, nil, nil
@@ -256,7 +256,7 @@ func (self *accountPool) insertAccountFailCallback(b common.Block, s verifier.Bl
 func (self *accountPool) insertAccountSuccessCallback(b common.Block, s verifier.BlockVerifyStat) {
 	log.Info("do nothing. height:%d, hash:%s, pool:%s", b.Height(), b.Hash(), self.Id)
 }
-func (self *accountPool) FindInChain(hash string, height int) bool {
+func (self *accountPool) FindInChain(hash string, height uint64) bool {
 
 	for _, c := range self.chainpool.chains {
 		b := c.heightBlocks[height]

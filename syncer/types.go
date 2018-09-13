@@ -3,7 +3,7 @@ package syncer
 import "github.com/viteshan/naive-vite/common"
 
 type stateMsg struct {
-	Height int
+	Height uint64
 	Hash   string
 }
 
@@ -25,15 +25,15 @@ type snapshotHashesMsg struct {
 
 type requestAccountHashMsg struct {
 	Address string
-	Height  int
+	Height  uint64
 	Hash    string
-	PrevCnt int
+	PrevCnt uint64
 }
 
 type requestSnapshotHashMsg struct {
-	Height  int
+	Height  uint64
 	Hash    string
-	PrevCnt int
+	PrevCnt uint64
 }
 
 type requestAccountBlockMsg struct {
@@ -46,6 +46,6 @@ type requestSnapshotBlockMsg struct {
 }
 
 type peerState struct {
-	Height int
+	Height uint64
 	Hash   string
 }
