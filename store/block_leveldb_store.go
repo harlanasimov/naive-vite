@@ -26,7 +26,7 @@ type blockLeveldbStore struct {
 
 func (self *blockLeveldbStore) initAccountGenesis() {
 	for _, genesis := range genesisBlocks {
-		block := self.GetAccountByHeight(genesis.Signer(), 0)
+		block := self.GetAccountByHeight(genesis.Signer(), common.FirstHeight)
 		if block == nil {
 			self.PutAccount(genesis.Signer(), genesis)
 		}
