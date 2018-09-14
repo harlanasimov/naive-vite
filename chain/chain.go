@@ -2,11 +2,13 @@ package chain
 
 import (
 	"sync"
+	"time"
 
 	"github.com/viteshan/naive-vite/common"
 	"github.com/viteshan/naive-vite/common/config"
 	"github.com/viteshan/naive-vite/common/face"
 	"github.com/viteshan/naive-vite/common/log"
+	"github.com/viteshan/naive-vite/monitor"
 	"github.com/viteshan/naive-vite/store"
 )
 
@@ -128,14 +130,17 @@ func (self *blockchain) HeadAccount(address string) (*common.AccountStateBlock, 
 }
 
 func (self *blockchain) GetAccountByHashH(address string, hashH common.HashHeight) *common.AccountStateBlock {
+	defer monitor.LogTime("chain", "accountByHashH", time.Now())
 	return self.selfAc(address).GetBlockByHashH(hashH)
 }
 
 func (self *blockchain) GetAccountByHash(address string, hash string) *common.AccountStateBlock {
+	defer monitor.LogTime("chain", "accountByHash", time.Now())
 	return self.selfAc(address).GetBlockByHash(address, hash)
 }
 
 func (self *blockchain) GetAccountByHeight(address string, height uint64) *common.AccountStateBlock {
+	defer monitor.LogTime("chain", "accountByHeight", time.Now())
 	return self.selfAc(address).GetBlockByHeight(height)
 }
 

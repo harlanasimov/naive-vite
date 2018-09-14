@@ -52,6 +52,8 @@ type BCPool struct {
 	version  *version.Version
 	verifier verifier.Verifier
 	rMu      sync.Mutex // direct add and loop insert
+
+	compactLock *common.NonBlockLock // snippet,chain
 }
 
 type blockPool struct {
@@ -242,8 +244,7 @@ func newBlockChainPool(name string) *BCPool {
 		Id: name,
 	}
 }
-func (self *BCPool) init(
-	rw chainRw,
+func (self *BCPool) init(rw chainRw,
 	verifier verifier.Verifier,
 	syncer *fetcher) {
 
@@ -264,6 +265,7 @@ func (self *BCPool) init(
 	self.blockpool = blockpool
 	self.verifier = verifier
 	self.syncer = syncer
+	self.compactLock = &common.NonBlockLock{}
 
 	self.chainpool.init()
 
@@ -1017,6 +1019,11 @@ func (self *BCPool) loop() {
 }
 
 func (self *BCPool) ExistInCurrent(request face.FetchRequest) bool {
+	if !self.compactLock.TryLock() {
+		return false
+	} else {
+		defer self.compactLock.UnLock()
+	}
 	_, ok := self.chainpool.current.heightBlocks[request.Height]
 	return ok
 }

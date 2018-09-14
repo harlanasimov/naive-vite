@@ -3,8 +3,8 @@ package syncer
 import (
 	"encoding/json"
 
-	"github.com/prometheus/common/log"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/common/log"
 	"github.com/viteshan/naive-vite/p2p"
 )
 

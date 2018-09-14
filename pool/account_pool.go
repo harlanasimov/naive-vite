@@ -19,8 +19,7 @@ type accountPool struct {
 	rw         *accountCh
 	verifyTask verifier.Task
 
-	loopTime    time.Time
-	compactLock common.NonBlockLock
+	loopTime time.Time
 }
 
 func newAccountPool(name string, rw *accountCh, v *version.Version) *accountPool {
