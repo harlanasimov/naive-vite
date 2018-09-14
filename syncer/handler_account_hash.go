@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/prometheus/common/log"
-	"github.com/vitelabs/go-vite/p2p"
 	"github.com/viteshan/naive-vite/common"
+	"github.com/viteshan/naive-vite/p2p"
 )
 
 type reqAccountHashHandler struct {
