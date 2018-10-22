@@ -27,7 +27,6 @@ type peer struct {
 	remoteAddr  net.Addr
 	loopWg      sync.WaitGroup
 	state       interface{}
-	mu          sync.Mutex
 }
 
 func (self *peer) SetState(s interface{}) {
@@ -46,13 +45,13 @@ func (self *peer) Write(msg *Msg) error {
 		log.Error("serialize msg fail. err:%v, msg:%v", err, msg)
 		return err
 	}
-	self.mu.Lock()
-	defer self.mu.Unlock()
-	if len(self.writeCh) >= self.writeChCap {
+
+	select {
+	case self.writeCh <- byt:
+	default:
 		log.Warn("write channel is full and message will be discarded.")
 		return errors.New("write channel is full.")
 	}
-	self.writeCh <- byt
 	return nil
 }
 
